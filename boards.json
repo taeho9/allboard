@@ -1,0 +1,16 @@
+{
+  "Clien": [
+    {
+      "name": "추천글",
+      "url": "https://www.clien.net/service/recommend"
+    },
+    {
+      "name": "모두의공원",
+      "url": "https://www.clien.net/service/board/park"
+    },
+    {
+      "name": "새로운소식",
+      "url": "https://www.clien.net/service/board/news"
+    }
+  ]
+}
