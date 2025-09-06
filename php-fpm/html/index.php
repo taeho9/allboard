@@ -53,6 +53,10 @@ foreach ($communities as $siteName => $boards) {
 
         // DOMDocument를 사용하여 HTML 파싱
         $dom = new DOMDocument();
+        // 뽐뿌는 EUC-KR 인코딩을 사용하므로 UTF-8로 변환
+        if ($siteName === '뽐뿌') {
+            $html = mb_convert_encoding($html, 'HTML-ENTITIES', 'EUC-KR');
+        }
         @$dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
         $xpath = new DOMXPath($dom);
         
@@ -85,32 +89,44 @@ foreach ($communities as $siteName => $boards) {
                 }
             }
         } elseif ($siteName === '뽐뿌') {
-            // 뽐뿌는 tr[class^="list"] 이 일반게시글, tr[class="list_notice"] 가 공지
-            $articles = $xpath->query('//tr[contains(@class, "list") and not(contains(@class, "list_notice"))]');
+            $isHotBoard = strpos($boardUrl, 'hot.php') !== false;
+            $articleQuery = $isHotBoard
+                ? '//table[@class="board_table"]//tr[not(@align="center") and .//a]' // HOT/인기글 게시판
+                : '//tr[contains(@class, "list") and not(contains(@class, "list_notice"))]'; // 일반 게시판
+
+            $articles = $xpath->query($articleQuery);
+
             foreach ($articles as $article) {
-                // 제목과 URL 추출
-                $titleNode = $xpath->query('.//font[@class="list_title"]', $article);
-                $title = $titleNode->length > 0 ? trim($titleNode->item(0)->textContent) : 'N/A';
-                
-                $urlNode = $xpath->query('.//font[@class="list_title"]/parent::a', $article);
-                $url = 'N/A';
-                if ($urlNode->length > 0) {
-                    $relativeUrl = $urlNode->item(0)->getAttribute('href');
-                    $url = 'https://www.ppomppu.co.kr/zboard/' . $relativeUrl;
-                }
+                $title = 'N/A'; $url = 'N/A'; $commentCount = ''; $views = 'N/A';
 
-                // 댓글 수 추출
-                $commentNode = $xpath->query('.//span[@class="list_comment2"]/span', $article);
-                $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
-
-                // 조회수 추출 (조회수는 마지막 td에 위치)
-                $viewsNode = $xpath->query('.//td[last()]', $article);
-                $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
-
-                // HOT/인기글 게시판은 조회수 대신 추천/비추천 수가 표시됨
-                if (strpos($boardUrl, 'hot.php') !== false) {
-                    $recommendNode = $xpath->query('.//td[count(preceding-sibling::td)=5]', $article);
+                if ($isHotBoard) {
+                    // HOT/인기글 게시판 파싱
+                    $titleNode = $xpath->query('.//a[.//font]', $article)->item(0);
+                    if ($titleNode) {
+                        $title = trim($titleNode->textContent);
+                        $relativeUrl = $titleNode->getAttribute('href');
+                        // hot.php 링크는 이미 절대경로이거나 다른 상대경로일 수 있음
+                        $url = (strpos($relativeUrl, 'http') === 0) ? $relativeUrl : 'https://www.ppomppu.co.kr' . $relativeUrl;
+                    }
+                    $commentNode = $xpath->query('.//span[@class="list_comment2"]', $article);
+                    $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
+                    $recommendNode = $xpath->query('.//td[count(preceding-sibling::td)=3]', $article);
                     $views = $recommendNode->length > 0 ? trim($recommendNode->item(0)->textContent) : 'N/A';
+                } else {
+                    // 일반 게시판(정치자유) 파싱
+                    $titleNode = $xpath->query('.//font[@class="list_title"]', $article)->item(0);
+                    if ($titleNode) {
+                        $title = trim($titleNode->textContent);
+                        $urlNode = $xpath->query('./ancestor::a', $titleNode)->item(0);
+                        if ($urlNode) {
+                            $relativeUrl = $urlNode->getAttribute('href');
+                            $url = 'https://www.ppomppu.co.kr/zboard/' . $relativeUrl;
+                        }
+                    }
+                    $commentNode = $xpath->query('.//span[@class="list_comment2"]/span', $article);
+                    $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
+                    $viewsNode = $xpath->query('.//td[last()]', $article);
+                    $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
                 }
 
                 if ($title !== 'N/A') {
@@ -135,15 +151,15 @@ foreach ($communities as $siteName => $boards) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllBoard - 커뮤니티 인기글 모음</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; margin: 0; padding: 7px; background-color: #f4f4f9; color: #333; }
-        .container { max-width: 1440px; margin: auto; background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; background-color: #f4f4f9; color: #333; }
+        .container { max-width: 1440px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { text-align: center; color: #2c3e50; }
-        .site-title { font-size: 2em; color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 5px; margin-bottom: 10px; }
-        .boards-container { display: flex; flex-wrap: wrap; gap: 10px; }
+        .site-title { font-size: 2em; color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 20px; }
+        .boards-container { display: flex; flex-wrap: wrap; gap: 20px; }
         .board-column { flex: 1; min-width: 280px; }
-        .board-title { font-size: 1.5em; color: #2980b9; margin-top: 10px; margin-bottom: 15px; }
+        .board-title { font-size: 1.5em; color: #2980b9; margin-top: 20px; margin-bottom: 15px; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        th, td { padding: 6px 7px; text-align: left; border-bottom: 1px solid #ddd; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background-color: #ecf0f1; }
         td { word-break: break-all; } /* 긴 제목이 셀을 넘어가지 않도록 처리 */
         tr:hover { background-color: #f5f5f5; }
