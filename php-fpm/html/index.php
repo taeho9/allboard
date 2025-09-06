@@ -105,12 +105,14 @@ foreach ($communities as $siteName => $boards) {
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; background-color: #f4f4f9; color: #333; }
         .container { max-width: 900px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { text-align: center; color: #2c3e50; }
-        .site-section { margin-bottom: 40px; }
         .site-title { font-size: 2em; color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 20px; }
+        .boards-container { display: flex; flex-wrap: wrap; gap: 20px; }
+        .board-column { flex: 1; min-width: 280px; }
         .board-title { font-size: 1.5em; color: #2980b9; margin-top: 20px; margin-bottom: 15px; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background-color: #ecf0f1; }
+        td { word-break: break-all; } /* 긴 제목이 셀을 넘어가지 않도록 처리 */
         tr:hover { background-color: #f5f5f5; }
         td.views { text-align: center; width: 80px; }
         a { color: #3498db; text-decoration: none; }
@@ -123,37 +125,41 @@ foreach ($communities as $siteName => $boards) {
         <h1>커뮤니티 인기글 모음</h1>
 
         <?php foreach ($allPostsBySite as $siteName => $boards): ?>
-            <section class="site-section">
+            <section>
                 <h2 class="site-title"><?php echo htmlspecialchars($siteName); ?></h2>
 
-                <?php foreach ($boards as $boardName => $posts): ?>
-                    <h3 class="board-title"><?php echo htmlspecialchars($boardName); ?></h3>
-                    <?php if (empty($posts)): ?>
-                        <p>게시물이 없습니다.</p>
-                    <?php else: ?>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>제목</th>
-                                    <th class="views">조회수</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($posts as $post): ?>
-                                    <tr>
-                                        <td>
-                                            <a href="<?php echo htmlspecialchars($post['url']); ?>" target="_blank"><?php echo htmlspecialchars($post['title']); ?></a>
-                                            <?php if (!empty($post['comment_count'])): ?>
-                                                <span class="comment-count">[<?php echo htmlspecialchars($post['comment_count']); ?>]</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td class="views"><?php echo htmlspecialchars($post['views']); ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    <?php endif; ?>
-                <?php endforeach; ?>
+                <div class="boards-container">
+                    <?php foreach ($boards as $boardName => $posts): ?>
+                        <div class="board-column">
+                            <h3 class="board-title"><?php echo htmlspecialchars($boardName); ?></h3>
+                            <?php if (empty($posts)): ?>
+                                <p>게시물이 없습니다.</p>
+                            <?php else: ?>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>제목</th>
+                                            <th class="views">조회수</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($posts as $post): ?>
+                                            <tr>
+                                                <td>
+                                                    <a href="<?php echo htmlspecialchars($post['url']); ?>" target="_blank"><?php echo htmlspecialchars($post['title']); ?></a>
+                                                    <?php if (!empty($post['comment_count'])): ?>
+                                                        <span class="comment-count">[<?php echo htmlspecialchars($post['comment_count']); ?>]</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td class="views"><?php echo htmlspecialchars($post['views']); ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
             </section>
         <?php endforeach; ?>
     </div>
