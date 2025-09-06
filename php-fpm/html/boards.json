@@ -1,16 +1,16 @@
 {
-  "Clien": [
+  "클리앙": [
     {
       "name": "추천글",
       "url": "https://www.clien.net/service/recommend"
     },
     {
-      "name": "모두의공원",
-      "url": "https://www.clien.net/service/board/park"
+      "name": "강좌/사용기",
+      "url": "https://www.clien.net/service/group/allreview"
     },
     {
-      "name": "새로운소식",
-      "url": "https://www.clien.net/service/board/news"
+      "name": "정보와 자료",
+      "url": "https://www.clien.net/service/group/allinfo"
     }
   ]
 }

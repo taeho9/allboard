@@ -23,6 +23,7 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 // 2. 각 커뮤니티 사이트별로 반복
 foreach ($communities as $siteName => $boards) {
     // echo "========= [{$siteName}] 사이트 처리 시작 =========\n";
+    // error_log("========= [{$siteName}] 사이트 처리 시작 =========");
     // 결과 배열에 사이트 이름을 키로 하는 빈 배열을 초기화
     $allPostsBySite[$siteName] = [];
 
@@ -30,8 +31,9 @@ foreach ($communities as $siteName => $boards) {
     foreach ($boards as $boardInfo) {
         $boardName = $boardInfo['name'];
         $boardUrl = $boardInfo['url'];
-
-        // echo "--- [{$boardName}] 게시판 데이터 수집 중... ({$boardUrl}) ---\n";
+        
+        // 사이트 배열 아래에 게시판 이름으로 된 빈 배열을 초기화합니다.
+        $allPostsBySite[$siteName][$boardName] = [];
 
         // cURL을 사용하여 URL로부터 HTML을 가져옵니다.
         $ch = curl_init();
@@ -45,7 +47,7 @@ foreach ($communities as $siteName => $boards) {
 
         if ($httpCode != 200 || $html === false) {
             // echo "경고: '{$boardName}' 게시판의 HTML을 가져오는 데 실패했습니다. (HTTP 상태 코드: {$httpCode})\n";
-            error_log("경고: '{$boardName}' 게시판의 HTML을 가져오는 데 실패했습니다. (HTTP 상태 코드: {$httpCode})");
+            // error_log("경고: '{$boardName}' 게시판의 HTML을 가져오는 데 실패했습니다. (HTTP 상태 코드: {$httpCode})");
             continue; // 다음 게시판으로 넘어감
         }
 
@@ -75,16 +77,15 @@ foreach ($communities as $siteName => $boards) {
 
             // 추출한 정보를 현재 처리 중인 사이트의 결과 배열에 추가
             if ($title !== 'N/A') {
-                $allPostsBySite[$siteName][] = [
+                // 이제 게시판 이름 키 아래에 게시물을 추가합니다.
+                $allPostsBySite[$siteName][$boardName][] = [
                     'views' => $views,
-                    'board' => $currentBoard,
                     'title' => $title,
                     'url' => $url,
                 ];
             }
         }
     }
-    // echo "========= [{$siteName}] 사이트 처리 완료 =========\n\n";
 }
 
 // 4. 최종 결과 JSON 형식으로 출력
