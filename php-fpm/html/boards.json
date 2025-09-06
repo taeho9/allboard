@@ -12,5 +12,19 @@
       "name": "정보와 자료",
       "url": "https://www.clien.net/service/group/allinfo"
     }
+  ],
+  "뽐뿌": [
+    {
+      "name": "HOT 게시글",
+      "url": "https://www.ppomppu.co.kr/hot.php?category=2"
+    },
+    {
+      "name": "인기글",
+      "url": "https://www.ppomppu.co.kr/hot.php?category=1"
+    },
+    {
+      "name": "정치자유게시판",
+      "url": "https://www.ppomppu.co.kr/zboard/zboard.php?id=issue"
+    }
   ]
 }

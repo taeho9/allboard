@@ -55,39 +55,72 @@ foreach ($communities as $siteName => $boards) {
         $dom = new DOMDocument();
         @$dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
         $xpath = new DOMXPath($dom);
-
-        $articles = $xpath->query("//div[contains(@class, 'list_item') and contains(@class, 'symph_row')]");
-
-        foreach ($articles as $article) {
-            $viewsNode = $xpath->query(".//div[@class='list_hit']/span[@class='hit']", $article);
-            $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
-
-            $boardNode = $xpath->query(".//span[contains(@class, 'shortname')]", $article);
-            $currentBoard = $boardNode->length > 0 ? trim($boardNode->item(0)->getAttribute('title')) : 'N/A';
-            
-            $titleNode = $xpath->query(".//span[contains(@class, 'subject_fixed')]", $article);
-            $title = $titleNode->length > 0 ? trim($titleNode->item(0)->getAttribute('title')) : 'N/A';
-
-            // 댓글 수 추출 (예: <span class="rSymph05">23</span>)
-            $commentNode = $xpath->query(".//span[contains(@class, 'rSymph')]", $article);
-            $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
-
-            $urlNode = $xpath->query(".//a[contains(@class, 'list_subject')]", $article);
-            $url = 'N/A';
-            if ($urlNode->length > 0) {
-                $relativeUrl = $urlNode->item(0)->getAttribute('href');
-                $url = 'https://www.clien.net' . $relativeUrl;
+        
+        if ($siteName === '클리앙') {
+            $articles = $xpath->query("//div[contains(@class, 'list_item') and contains(@class, 'symph_row')]");
+            foreach ($articles as $article) {
+                $viewsNode = $xpath->query(".//div[@class='list_hit']/span[@class='hit']", $article);
+                $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
+                
+                $titleNode = $xpath->query(".//span[contains(@class, 'subject_fixed')]", $article);
+                $title = $titleNode->length > 0 ? trim($titleNode->item(0)->getAttribute('title')) : 'N/A';
+    
+                $commentNode = $xpath->query(".//span[contains(@class, 'rSymph')]", $article);
+                $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
+    
+                $urlNode = $xpath->query(".//a[contains(@class, 'list_subject')]", $article);
+                $url = 'N/A';
+                if ($urlNode->length > 0) {
+                    $relativeUrl = $urlNode->item(0)->getAttribute('href');
+                    $url = 'https://www.clien.net' . $relativeUrl;
+                }
+    
+                if ($title !== 'N/A') {
+                    $allPostsBySite[$siteName][$boardName][] = [
+                        'views' => $views,
+                        'comment_count' => $commentCount,
+                        'title' => $title,
+                        'url' => $url,
+                    ];
+                }
             }
+        } elseif ($siteName === '뽐뿌') {
+            // 뽐뿌는 tr[class^="list"] 이 일반게시글, tr[class="list_notice"] 가 공지
+            $articles = $xpath->query('//tr[contains(@class, "list") and not(contains(@class, "list_notice"))]');
+            foreach ($articles as $article) {
+                // 제목과 URL 추출
+                $titleNode = $xpath->query('.//font[@class="list_title"]', $article);
+                $title = $titleNode->length > 0 ? trim($titleNode->item(0)->textContent) : 'N/A';
+                
+                $urlNode = $xpath->query('.//font[@class="list_title"]/parent::a', $article);
+                $url = 'N/A';
+                if ($urlNode->length > 0) {
+                    $relativeUrl = $urlNode->item(0)->getAttribute('href');
+                    $url = 'https://www.ppomppu.co.kr/zboard/' . $relativeUrl;
+                }
 
-            // 추출한 정보를 현재 처리 중인 사이트의 결과 배열에 추가
-            if ($title !== 'N/A') {
-                // 이제 게시판 이름 키 아래에 게시물을 추가합니다.
-                $allPostsBySite[$siteName][$boardName][] = [
-                    'views' => $views,
-                    'comment_count' => $commentCount,
-                    'title' => $title,
-                    'url' => $url,
-                ];
+                // 댓글 수 추출
+                $commentNode = $xpath->query('.//span[@class="list_comment2"]/span', $article);
+                $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
+
+                // 조회수 추출 (조회수는 마지막 td에 위치)
+                $viewsNode = $xpath->query('.//td[last()]', $article);
+                $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
+
+                // HOT/인기글 게시판은 조회수 대신 추천/비추천 수가 표시됨
+                if (strpos($boardUrl, 'hot.php') !== false) {
+                    $recommendNode = $xpath->query('.//td[count(preceding-sibling::td)=5]', $article);
+                    $views = $recommendNode->length > 0 ? trim($recommendNode->item(0)->textContent) : 'N/A';
+                }
+
+                if ($title !== 'N/A') {
+                    $allPostsBySite[$siteName][$boardName][] = [
+                        'views' => $views,
+                        'comment_count' => $commentCount,
+                        'title' => $title,
+                        'url' => $url,
+                    ];
+                }
             }
         }
     }
@@ -100,7 +133,7 @@ foreach ($communities as $siteName => $boards) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>커뮤니티 인기글 모음</title>
+    <title>AllBoard - 커뮤니티 인기글 모음</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; margin: 0; padding: 7px; background-color: #f4f4f9; color: #333; }
         .container { max-width: 1440px; margin: auto; background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
@@ -109,7 +142,7 @@ foreach ($communities as $siteName => $boards) {
         .boards-container { display: flex; flex-wrap: wrap; gap: 10px; }
         .board-column { flex: 1; min-width: 280px; }
         .board-title { font-size: 1.5em; color: #2980b9; margin-top: 10px; margin-bottom: 15px; }
-        table { width: 100%; border-collapse: collapse; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         th, td { padding: 6px 7px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background-color: #ecf0f1; }
         td { word-break: break-all; } /* 긴 제목이 셀을 넘어가지 않도록 처리 */
@@ -122,7 +155,7 @@ foreach ($communities as $siteName => $boards) {
 </head>
 <body>
     <div class="container">
-        <h1>커뮤니티 인기글 모음</h1>
+        <h1>AllBoard - 커뮤니티 인기글 모음</h1>
 
         <?php foreach ($allPostsBySite as $siteName => $boards): ?>
             <section>
