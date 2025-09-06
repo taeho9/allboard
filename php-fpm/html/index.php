@@ -68,6 +68,10 @@ foreach ($communities as $siteName => $boards) {
             $titleNode = $xpath->query(".//span[contains(@class, 'subject_fixed')]", $article);
             $title = $titleNode->length > 0 ? trim($titleNode->item(0)->getAttribute('title')) : 'N/A';
 
+            // 댓글 수 추출 (예: <span class="rSymph05">23</span>)
+            $commentNode = $xpath->query(".//span[contains(@class, 'rSymph')]", $article);
+            $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
+
             $urlNode = $xpath->query(".//a[contains(@class, 'list_subject')]", $article);
             $url = 'N/A';
             if ($urlNode->length > 0) {
@@ -80,6 +84,7 @@ foreach ($communities as $siteName => $boards) {
                 // 이제 게시판 이름 키 아래에 게시물을 추가합니다.
                 $allPostsBySite[$siteName][$boardName][] = [
                     'views' => $views,
+                    'comment_count' => $commentCount,
                     'title' => $title,
                     'url' => $url,
                 ];
@@ -110,6 +115,7 @@ foreach ($communities as $siteName => $boards) {
         td.views { text-align: center; width: 80px; }
         a { color: #3498db; text-decoration: none; }
         a:hover { text-decoration: underline; }
+        .comment-count { color: #e74c3c; font-weight: bold; margin-left: 5px; }
     </style>
 </head>
 <body>
@@ -135,7 +141,12 @@ foreach ($communities as $siteName => $boards) {
                             <tbody>
                                 <?php foreach ($posts as $post): ?>
                                     <tr>
-                                        <td><a href="<?php echo htmlspecialchars($post['url']); ?>" target="_blank"><?php echo htmlspecialchars($post['title']); ?></a></td>
+                                        <td>
+                                            <a href="<?php echo htmlspecialchars($post['url']); ?>" target="_blank"><?php echo htmlspecialchars($post['title']); ?></a>
+                                            <?php if (!empty($post['comment_count'])): ?>
+                                                <span class="comment-count">[<?php echo htmlspecialchars($post['comment_count']); ?>]</span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td class="views"><?php echo htmlspecialchars($post['views']); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
