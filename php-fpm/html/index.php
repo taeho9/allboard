@@ -22,7 +22,7 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 
 // 2. 각 커뮤니티 사이트별로 반복
 foreach ($communities as $siteName => $boards) {
-    echo "========= [{$siteName}] 사이트 처리 시작 =========\n";
+    // echo "========= [{$siteName}] 사이트 처리 시작 =========\n";
     // 결과 배열에 사이트 이름을 키로 하는 빈 배열을 초기화
     $allPostsBySite[$siteName] = [];
 
@@ -31,7 +31,7 @@ foreach ($communities as $siteName => $boards) {
         $boardName = $boardInfo['name'];
         $boardUrl = $boardInfo['url'];
 
-        echo "--- [{$boardName}] 게시판 데이터 수집 중... ({$boardUrl}) ---\n";
+        // echo "--- [{$boardName}] 게시판 데이터 수집 중... ({$boardUrl}) ---\n";
 
         // cURL을 사용하여 URL로부터 HTML을 가져옵니다.
         $ch = curl_init();
@@ -44,13 +44,14 @@ foreach ($communities as $siteName => $boards) {
         curl_close($ch);
 
         if ($httpCode != 200 || $html === false) {
-            echo "경고: '{$boardName}' 게시판의 HTML을 가져오는 데 실패했습니다. (HTTP 상태 코드: {$httpCode})\n";
+            // echo "경고: '{$boardName}' 게시판의 HTML을 가져오는 데 실패했습니다. (HTTP 상태 코드: {$httpCode})\n";
+            error_log("경고: '{$boardName}' 게시판의 HTML을 가져오는 데 실패했습니다. (HTTP 상태 코드: {$httpCode})");
             continue; // 다음 게시판으로 넘어감
         }
 
         // DOMDocument를 사용하여 HTML 파싱
         $dom = new DOMDocument();
-        @$dom->loadHTML($html);
+        @$dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
         $xpath = new DOMXPath($dom);
 
         $articles = $xpath->query("//div[contains(@class, 'list_item') and contains(@class, 'symph_row')]");
@@ -83,7 +84,7 @@ foreach ($communities as $siteName => $boards) {
             }
         }
     }
-    echo "========= [{$siteName}] 사이트 처리 완료 =========\n\n";
+    // echo "========= [{$siteName}] 사이트 처리 완료 =========\n\n";
 }
 
 // 4. 최종 결과 JSON 형식으로 출력

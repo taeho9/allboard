@@ -17,7 +17,7 @@ services:
       - php-fpm
 
   php-fpm:
-    build:
+    build:ㅣㅐㅣ
       context: ./php-fpm
     container_name: allboard-php-fpm
     volumes:
