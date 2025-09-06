@@ -102,15 +102,15 @@ foreach ($communities as $siteName => $boards) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>커뮤니티 인기글 모음</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; background-color: #f4f4f9; color: #333; }
-        .container { max-width: 1440px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; margin: 0; padding: 7px; background-color: #f4f4f9; color: #333; }
+        .container { max-width: 1440px; margin: auto; background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         h1 { text-align: center; color: #2c3e50; }
-        .site-title { font-size: 2em; color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 20px; }
-        .boards-container { display: flex; flex-wrap: wrap; gap: 20px; }
+        .site-title { font-size: 2em; color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 5px; margin-bottom: 10px; }
+        .boards-container { display: flex; flex-wrap: wrap; gap: 10px; }
         .board-column { flex: 1; min-width: 280px; }
-        .board-title { font-size: 1.5em; color: #2980b9; margin-top: 20px; margin-bottom: 15px; }
+        .board-title { font-size: 1.5em; color: #2980b9; margin-top: 10px; margin-bottom: 15px; }
         table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
+        th, td { padding: 6px 7px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background-color: #ecf0f1; }
         td { word-break: break-all; } /* 긴 제목이 셀을 넘어가지 않도록 처리 */
         tr:hover { background-color: #f5f5f5; }
