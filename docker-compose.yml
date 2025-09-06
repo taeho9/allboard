@@ -1,0 +1,34 @@
+ersion: "3.8"
+
+services:
+  nginx:
+    build:
+      context: ./nginx
+    container_name: allboard-nginx
+    volumes:
+      - /data/allboard:/var/www/html
+    environment:
+      - TZ=Asia/Seoul
+    expose:
+      - "80"
+    networks:
+      - reverse_proxy
+    depends_on:
+      - php-fpm
+
+  php-fpm:
+    build:
+      context: ./php-fpm
+    container_name: allboard-php-fpm
+    volumes:
+      - /data/allboard:/data/allboard  # entrypoint 복사용 경로 (호스트 바인드 마운트)
+      - /data/allboard:/var/www/html        # 실제 PHP 코드 사용 경로
+      # 운영에는 /home/rocky 로 수정해서 머지해야 함
+    environment:
+      - TZ=Asia/Seoul
+    networks:
+      - reverse_proxy
+
+networks:
+  reverse_proxy:
+    external: true
