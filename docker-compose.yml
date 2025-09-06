@@ -1,4 +1,4 @@
-ersion: "3.8"
+version: "3.8"
 
 services:
   nginx:
@@ -32,3 +32,5 @@ services:
 networks:
   reverse_proxy:
     external: true
+
+# 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
