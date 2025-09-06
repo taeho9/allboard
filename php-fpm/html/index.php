@@ -93,10 +93,10 @@ foreach ($communities as $siteName => $boards) {
         } elseif ($siteName === '뽐뿌') {
             $articleQuery = '';
             if (strpos($boardUrl, 'hot.php?category=2') !== false) { // HOT 게시글
-                $articleQuery = '//table[@id="board_list_table_hot"]//tr[not(@align="center") and .//a]';
+                $articleQuery = '//table[contains(@class, "board_table")]//tr[contains(@class, "baseList")]';
             } elseif (strpos($boardUrl, 'hot.php?category=1') !== false) { // 인기글
-                $articleQuery = '//table[@id="board_list_table_best"]//tr[not(@align="center") and .//a]';
-            } else { // 일반 게시판 (정치자유게시판 등)
+                $articleQuery = '//table[contains(@class, "board_table")]//tr[contains(@class, "baseList")]';
+            } else { // 일반 게시판 (정치자유게시판)
                 $articleQuery = '//tr[contains(@class, "list") and not(contains(@class, "list_notice"))]';
             }
             $isHotBoard = strpos($boardUrl, 'hot.php') !== false; // 파싱 로직 분기를 위해 유지
@@ -108,17 +108,16 @@ foreach ($communities as $siteName => $boards) {
 
                 if ($isHotBoard) {
                     // HOT/인기글 게시판 파싱
-                    $titleNode = $xpath->query('.//a[.//font]', $article)->item(0);
+                    $titleNode = $xpath->query('.//a[contains(@class, "baseList-title")]', $article)->item(0);
                     if ($titleNode) {
                         $title = trim($titleNode->textContent);
                         $relativeUrl = $titleNode->getAttribute('href');
-                        // hot.php 링크는 이미 절대경로이거나 다른 상대경로일 수 있음
-                        $url = (strpos($relativeUrl, 'http') === 0) ? $relativeUrl : 'https://www.ppomppu.co.kr' . $relativeUrl;
+                        $url = 'https://www.ppomppu.co.kr' . $relativeUrl;
                     }
                     $commentNode = $xpath->query('.//span[@class="list_comment2"]', $article);
                     $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
-                    $recommendNode = $xpath->query('.//td[count(preceding-sibling::td)=3]', $article);
-                    $views = $recommendNode->length > 0 ? trim($recommendNode->item(0)->textContent) : 'N/A';
+                    $viewsNode = $xpath->query('.//td[contains(@class, "board_date")][last()]', $article);
+                    $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
                 } else {
                     // 일반 게시판(정치자유) 파싱
                     $titleNode = $xpath->query('.//td[contains(@class, "list_vspace")]/a', $article)->item(0);
