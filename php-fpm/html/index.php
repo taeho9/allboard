@@ -119,16 +119,15 @@ foreach ($communities as $siteName => $boards) {
                     $views = $recommendNode->length > 0 ? trim($recommendNode->item(0)->textContent) : 'N/A';
                 } else {
                     // 일반 게시판(정치자유) 파싱
-                    $titleNode = $xpath->query('.//font[@class="list_title"]', $article)->item(0);
+                    $titleNode = $xpath->query('.//td[contains(@class, "list_vspace")]/a', $article)->item(0);
                     if ($titleNode) {
                         $title = trim($titleNode->textContent);
-                        $urlNode = $xpath->query('./ancestor::a', $titleNode)->item(0);
-                        if ($urlNode) {
-                            $relativeUrl = $urlNode->getAttribute('href');
-                            $url = 'https://www.ppomppu.co.kr/zboard/' . $relativeUrl;
-                        }
+                        $relativeUrl = $titleNode->getAttribute('href');
+                        $parsedUrl = parse_url($boardUrl);
+                        $baseUrl = $parsedUrl['scheme'] . '://' . $parsedUrl['host'];
+                        $url = $baseUrl . '/zboard/' . ltrim($relativeUrl, './');
                     }
-                    $commentNode = $xpath->query('.//span[@class="list_comment2"]/span', $article);
+                    $commentNode = $xpath->query('.//span[@class="list_comment2"]', $article);
                     $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
                     $viewsNode = $xpath->query('.//td[last()]', $article);
                     $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
