@@ -55,7 +55,9 @@ foreach ($communities as $siteName => $boards) {
         $dom = new DOMDocument();
         // 뽐뿌는 EUC-KR 인코딩을 사용하므로 UTF-8로 변환
         if ($siteName === '뽐뿌') {
-            $html = mb_convert_encoding($html, 'HTML-ENTITIES', 'EUC-KR');
+            // EUC-KR -> UTF-8 변환 후 HTML 숫자 엔티티로 변환 (PHP 8.2+ 호환)
+            $html = mb_convert_encoding($html, 'UTF-8', 'EUC-KR');
+            $html = mb_encode_numericentity($html, [0x80, 0x10FFFF, 0, ~0], 'UTF-8');
         }
         @$dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
         $xpath = new DOMXPath($dom);
