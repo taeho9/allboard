@@ -89,10 +89,15 @@ foreach ($communities as $siteName => $boards) {
                 }
             }
         } elseif ($siteName === '뽐뿌') {
-            $isHotBoard = strpos($boardUrl, 'hot.php') !== false;
-            $articleQuery = $isHotBoard
-                ? '//table[@class="board_table"]//tr[not(@align="center") and .//a]' // HOT/인기글 게시판
-                : '//tr[contains(@class, "list") and not(contains(@class, "list_notice"))]'; // 일반 게시판
+            $articleQuery = '';
+            if (strpos($boardUrl, 'hot.php?category=2') !== false) { // HOT 게시글
+                $articleQuery = '//table[@id="board_list_table_hot"]//tr[not(@align="center") and .//a]';
+            } elseif (strpos($boardUrl, 'hot.php?category=1') !== false) { // 인기글
+                $articleQuery = '//table[@id="board_list_table_best"]//tr[not(@align="center") and .//a]';
+            } else { // 일반 게시판 (정치자유게시판 등)
+                $articleQuery = '//tr[contains(@class, "list") and not(contains(@class, "list_notice"))]';
+            }
+            $isHotBoard = strpos($boardUrl, 'hot.php') !== false; // 파싱 로직 분기를 위해 유지
 
             $articles = $xpath->query($articleQuery);
 
