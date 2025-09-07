@@ -68,10 +68,13 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
 
         if ($isHotBoard) {
             // HOT/인기글 게시판 파싱
-            $titleNode = $xpath->query('.//a[contains(@class, "baseList-title")]', $article)->item(0);
+            $linkNode = $xpath->query('.//a[contains(@class, "baseList-title")]', $article)->item(0);
+            $titleNode = $xpath->query('.//a[contains(@class, "baseList-title")]/span', $article)->item(0);
             if ($titleNode) {
                 $title = trim($titleNode->textContent);
-                $relativeUrl = $titleNode->getAttribute('href');
+            }
+            if ($linkNode) {
+                $relativeUrl = $linkNode->getAttribute('href');
                 $url = 'https://www.ppomppu.co.kr' . $relativeUrl;
             }
             $commentNode = $xpath->query('.//span[@class="list_comment2"]', $article);
