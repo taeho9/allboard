@@ -74,11 +74,12 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
                 $relativeUrl = $titleNode->getAttribute('href');
                 $url = 'https://www.ppomppu.co.kr' . $relativeUrl;
             }
-            echo $article . "\n";
             $commentNode = $xpath->query('.//span[@class="list_comment2"]', $article);
             $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
             $viewsNode = $xpath->query('.//td[contains(@class, "board_date")][last()]', $article);
             $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
+            echo $commentNode . "\n";
+            echo $viewsNode . "\n";
         } else {
             // 일반 게시판(정치자유) 파싱
             $titleNode = $xpath->query('.//td[contains(@class, "list_vspace")]/a', $article)->item(0);
