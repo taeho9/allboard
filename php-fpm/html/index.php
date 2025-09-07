@@ -74,6 +74,7 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
                 $relativeUrl = $titleNode->getAttribute('href');
                 $url = 'https://www.ppomppu.co.kr' . $relativeUrl;
             }
+            echo $article . "\n";
             $commentNode = $xpath->query('.//span[@class="list_comment2"]', $article);
             $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
             $viewsNode = $xpath->query('.//td[contains(@class, "board_date")][last()]', $article);
