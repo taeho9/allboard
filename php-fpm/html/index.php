@@ -68,30 +68,33 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
 
         if ($isHotBoard) {
             // HOT/인기글 게시판 파싱
-            $linkNode = $xpath->query('.//a[contains(@class, "baseList-title")]', $article)->item(0);
+            // <img> 태그를 자식으로 가지는 a 태그를 직접 찾습니다. 이것이 제목과 URL을 모두 포함한 가장 안쪽 태그입니다.
+            $linkNode = $xpath->query('.//a[contains(@class, "baseList-title") and .//img]', $article)->item(0);
             if ($linkNode) {
                 $relativeUrl = $linkNode->getAttribute('href');
                 $url = 'https://www.ppomppu.co.kr' . $relativeUrl;
 
-                // <a> 태그의 자식 노드를 순회하여 <img> 태그 뒤의 텍스트 노드를 찾습니다.
+                // 찾은 <a> 태그의 자식 노드를 순회하여 <img> 태그 뒤의 텍스트 노드를 제목으로 가져옵니다.
                 $foundImage = false;
                 foreach ($linkNode->childNodes as $child) {
                     if ($child->nodeName === 'img') {
                         $foundImage = true;
                         continue;
                     }
-                    if ($foundImage && $child instanceof DOMText) {
+                    // img 태그를 찾았고, 현재 노드가 텍스트 노드이며, 내용이 비어있지 않은 경우
+                    if ($foundImage && $child instanceof DOMText && trim($child->nodeValue) !== '') {
                         $title = trim($child->nodeValue);
                         break; // 제목을 찾았으면 반복 중단
                     }
                 }
             }
             $commentNode = $xpath->query('.//span[@class="list_comment2"]', $article);
-            $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
+            // 댓글은 a 태그 밖에 있는 경우도 있고 안에 있는 경우도 있으므로, tr 전체에서 다시 검색합니다.
+            $commentNodeInTr = $xpath->query('.//span[@class="list_comment2"]', $article);
+            $commentCount = $commentNodeInTr->length > 0 ? trim($commentNodeInTr->item(0)->textContent) : '';
             $viewsNode = $xpath->query('.//td[contains(@class, "board_date")][last()]', $article);
             $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
-            echo "제목: " . $title . " | 댓글 수: " . ($commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '없음') . "\n";
-            echo "제목: " . $title . " | 조회 수: " . ($viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : '없음') . "\n";
+            // echo "제목: " . $title . " | 댓글 수: " . $commentCount . " | 조회 수: " . $views . "\n";
         } else {
             // 일반 게시판(정치자유) 파싱
             $titleNode = $xpath->query('.//td[contains(@class, "list_vspace")]/a', $article)->item(0);
