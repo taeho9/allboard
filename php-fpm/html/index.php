@@ -1,6 +1,113 @@
 <?php
 
-// JSON 파일 경로
+/**
+ * 클리앙 게시판 파싱 함수
+ * @param DOMXPath $xpath
+ * @return array
+ */
+function parseClien(DOMXPath $xpath): array
+{
+    $posts = [];
+    $articles = $xpath->query("//div[contains(@class, 'list_item') and contains(@class, 'symph_row')]");
+    foreach ($articles as $article) {
+        $viewsNode = $xpath->query(".//div[@class='list_hit']/span[@class='hit']", $article);
+        $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
+
+        $titleNode = $xpath->query(".//span[contains(@class, 'subject_fixed')]", $article);
+        $title = $titleNode->length > 0 ? trim($titleNode->item(0)->getAttribute('title')) : 'N/A';
+
+        $commentNode = $xpath->query(".//span[contains(@class, 'rSymph')]", $article);
+        $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
+
+        $urlNode = $xpath->query(".//a[contains(@class, 'list_subject')]", $article);
+        $url = 'N/A';
+        if ($urlNode->length > 0) {
+            $relativeUrl = $urlNode->item(0)->getAttribute('href');
+            $url = 'https://www.clien.net' . $relativeUrl;
+        }
+
+        if ($title !== 'N/A') {
+            $posts[] = [
+                'views' => $views,
+                'comment_count' => $commentCount,
+                'title' => $title,
+                'url' => $url,
+            ];
+        }
+    }
+    return $posts;
+}
+
+/**
+ * 뽐뿌 게시판 파싱 함수
+ * @param DOMXPath $xpath
+ * @param string $boardUrl
+ * @return array
+ */
+function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
+{
+
+    $posts = [];
+    $articleQuery = '';
+    if (strpos($boardUrl, 'hot.php?category=2') !== false) { // HOT 게시글
+        $articleQuery = '//table[contains(@class, "board_table")]//tr[contains(@class, "baseList")]';
+    } elseif (strpos($boardUrl, 'hot.php?category=1') !== false) { // 인기글
+        $articleQuery = '//table[contains(@class, "board_table")]//tr[contains(@class, "baseList")]';
+    } else { // 일반 게시판 (정치자유게시판)
+        $articleQuery = '//tr[contains(@class, "list") and not(contains(@class, "list_notice"))]';
+    }
+    $isHotBoard = strpos($boardUrl, 'hot.php') !== false;
+
+    $articles = $xpath->query($articleQuery);
+
+    foreach ($articles as $article) {
+        $title = 'N/A';
+        $url = 'N/A';
+        $commentCount = '';
+        $views = 'N/A';
+
+        if ($isHotBoard) {
+            // HOT/인기글 게시판 파싱
+            $titleNode = $xpath->query('.//a[contains(@class, "baseList-title")]/a', $article)->item(0);
+            if ($titleNode) {
+                $title = trim($titleNode->textContent);
+                $relativeUrl = $titleNode->getAttribute('href');
+                $url = 'https://www.ppomppu.co.kr' . $relativeUrl;
+            }
+            $commentNode = $xpath->query('.//span[@class="list_comment2"]', $article);
+            $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
+            $viewsNode = $xpath->query('.//td[contains(@class, "board_date")][last()]', $article);
+            $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
+        } else {
+            // 일반 게시판(정치자유) 파싱
+            $titleNode = $xpath->query('.//td[contains(@class, "list_vspace")]/a', $article)->item(0);
+            if ($titleNode) {
+                $title = trim($titleNode->textContent);
+                $relativeUrl = $titleNode->getAttribute('href');
+                $parsedUrl = parse_url($boardUrl);
+                $baseUrl = $parsedUrl['scheme'] . '://' . $parsedUrl['host'];
+                $url = $baseUrl . '/zboard/' . ltrim($relativeUrl, './');
+            }
+            $commentNode = $xpath->query('.//span[@class="list_comment2"]', $article);
+            $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
+            $viewsNode = $xpath->query('.//td[last()]', $article);
+            $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
+        }
+
+        if ($title !== 'N/A') {
+            $posts[] = [
+                'views' => $views,
+                'comment_count' => $commentCount,
+                'title' => $title,
+                'url' => $url,
+            ];
+        }
+    }
+    return $posts;
+}
+
+
+// --- 메인 로직 시작 ---
 $jsonFile = 'boards.json';
 
 // 최종 결과를 담을 빈 배열 초기화
@@ -19,14 +126,13 @@ if (json_last_error() !== JSON_ERROR_NONE) {
     die("에러: JSON 파일 형식이 올바라지 않습니다.");
 }
 
-
 // 2. 각 커뮤니티 사이트별로 반복
 foreach ($communities as $siteName => $boards) {
     // echo "========= [{$siteName}] 사이트 처리 시작 =========\n";
     // error_log("========= [{$siteName}] 사이트 처리 시작 =========");
     // 결과 배열에 사이트 이름을 키로 하는 빈 배열을 초기화
     $allPostsBySite[$siteName] = [];
-
+    
     // 3. 각 게시판 URL에 접속하여 HTML 파싱 (기존 로직)
     foreach ($boards as $boardInfo) {
         $boardName = $boardInfo['name'];
@@ -61,88 +167,11 @@ foreach ($communities as $siteName => $boards) {
         }
         @$dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
         $xpath = new DOMXPath($dom);
-        
+
         if ($siteName === '클리앙') {
-            $articles = $xpath->query("//div[contains(@class, 'list_item') and contains(@class, 'symph_row')]");
-            foreach ($articles as $article) {
-                $viewsNode = $xpath->query(".//div[@class='list_hit']/span[@class='hit']", $article);
-                $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
-                
-                $titleNode = $xpath->query(".//span[contains(@class, 'subject_fixed')]", $article);
-                $title = $titleNode->length > 0 ? trim($titleNode->item(0)->getAttribute('title')) : 'N/A';
-    
-                $commentNode = $xpath->query(".//span[contains(@class, 'rSymph')]", $article);
-                $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
-    
-                $urlNode = $xpath->query(".//a[contains(@class, 'list_subject')]", $article);
-                $url = 'N/A';
-                if ($urlNode->length > 0) {
-                    $relativeUrl = $urlNode->item(0)->getAttribute('href');
-                    $url = 'https://www.clien.net' . $relativeUrl;
-                }
-    
-                if ($title !== 'N/A') {
-                    $allPostsBySite[$siteName][$boardName][] = [
-                        'views' => $views,
-                        'comment_count' => $commentCount,
-                        'title' => $title,
-                        'url' => $url,
-                    ];
-                }
-            }
+            $allPostsBySite[$siteName][$boardName] = parseClien($xpath);
         } elseif ($siteName === '뽐뿌') {
-            $articleQuery = '';
-            if (strpos($boardUrl, 'hot.php?category=2') !== false) { // HOT 게시글
-                $articleQuery = '//table[contains(@class, "board_table")]//tr[contains(@class, "baseList")]';
-            } elseif (strpos($boardUrl, 'hot.php?category=1') !== false) { // 인기글
-                $articleQuery = '//table[contains(@class, "board_table")]//tr[contains(@class, "baseList")]';
-            } else { // 일반 게시판 (정치자유게시판)
-                $articleQuery = '//tr[contains(@class, "list") and not(contains(@class, "list_notice"))]';
-            }
-            $isHotBoard = strpos($boardUrl, 'hot.php') !== false; // 파싱 로직 분기를 위해 유지
-
-            $articles = $xpath->query($articleQuery);
-
-            foreach ($articles as $article) {
-                $title = 'N/A'; $url = 'N/A'; $commentCount = ''; $views = 'N/A';
-
-                if ($isHotBoard) {
-                    // HOT/인기글 게시판 파싱
-                    $titleNode = $xpath->query('.//a[contains(@class, "baseList-title")]/a', $article)->item(0);
-                    if ($titleNode) {
-                        $title = trim($titleNode->textContent);
-                        $relativeUrl = $titleNode->getAttribute('href');
-                        $url = 'https://www.ppomppu.co.kr' . $relativeUrl;
-                    }
-                    $commentNode = $xpath->query('.//span[@class="list_comment2"]', $article);
-                    $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
-                    $viewsNode = $xpath->query('.//td[contains(@class, "board_date")][last()]', $article);
-                    $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
-                } else {
-                    // 일반 게시판(정치자유) 파싱
-                    $titleNode = $xpath->query('.//td[contains(@class, "list_vspace")]/a', $article)->item(0);
-                    if ($titleNode) {
-                        $title = trim($titleNode->textContent);
-                        $relativeUrl = $titleNode->getAttribute('href');
-                        $parsedUrl = parse_url($boardUrl);
-                        $baseUrl = $parsedUrl['scheme'] . '://' . $parsedUrl['host'];
-                        $url = $baseUrl . '/zboard/' . ltrim($relativeUrl, './');
-                    }
-                    $commentNode = $xpath->query('.//span[@class="list_comment2"]', $article);
-                    $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
-                    $viewsNode = $xpath->query('.//td[last()]', $article);
-                    $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
-                }
-
-                if ($title !== 'N/A') {
-                    $allPostsBySite[$siteName][$boardName][] = [
-                        'views' => $views,
-                        'comment_count' => $commentCount,
-                        'title' => $title,
-                        'url' => $url,
-                    ];
-                }
-            }
+            $allPostsBySite[$siteName][$boardName] = parsePpomppu($xpath, $boardUrl);
         }
     }
 }
