@@ -78,8 +78,8 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
             $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
             $viewsNode = $xpath->query('.//td[contains(@class, "board_date")][last()]', $article);
             $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
-            echo $commentNode . "\n";
-            echo $viewsNode . "\n";
+            echo "댓글 수: " . ($commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '없음') . "\n";
+            echo "조회 수: " . ($viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : '없음') . "\n";
         } else {
             // 일반 게시판(정치자유) 파싱
             $titleNode = $xpath->query('.//td[contains(@class, "list_vspace")]/a', $article)->item(0);
