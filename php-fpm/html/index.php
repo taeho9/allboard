@@ -48,15 +48,12 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
 {
 
     $posts = [];
-    $articleQuery = '';
-    if (strpos($boardUrl, 'hot.php?category=2') !== false) { // HOT 게시글
+    $articleQuery = "//table[@id='revolution_main_table']//tr[contains(@class, 'baseList') and not(contains(@class, 'baseNotice'))]";
+
+    // HOT 게시판은 테이블 구조가 다르므로 다른 쿼리를 사용합니다.
+    if (strpos($boardUrl, 'hot.php') !== false) {
+        // HOT 게시글과 인기글은 동일한 구조를 가집니다.
         $articleQuery = '//table[contains(@class, "board_table")]//tr[contains(@class, "baseList")]';
-    } elseif (strpos($boardUrl, 'hot.php?category=1') !== false) { // 인기글
-        $articleQuery = '//table[contains(@class, "board_table")]//tr[contains(@class, "baseList")]';
-    } elseif (strpos($boardUrl, 'id=issue&hotlist_flag=999') !== false) { // 정자게시판(인기)
-        $articleQuery = "//table[@id='revolution_main_table']//tr[contains(@class, 'baseList') and not(contains(@class, 'baseNotice'))]";
-    } else { // 일반 게시판 (정치자유게시판)
-        $articleQuery = '//tr[contains(@class, "list") and not(contains(@class, "list_notice"))]';
     }
     $isHotBoard = strpos($boardUrl, 'hot.php') !== false;
     // 정자게시판(인기) URL인지 확인하는 플래그 추가
@@ -69,7 +66,6 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
         $url = 'N/A';
         $commentCount = '';
         $views = 'N/A';
-
         if ($isHotBoard) { // HOT/인기글 게시판 파싱
             // HOT/인기글 게시판 파싱
             // <img> 태그를 자식으로 가지는 a 태그를 직접 찾습니다. 이것이 제목과 URL을 모두 포함한 가장 안쪽 태그입니다.
@@ -96,26 +92,22 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
             // 댓글은 a 태그 밖에 있는 경우도 있고 안에 있는 경우도 있으므로, tr 전체에서 다시 검색합니다.
             $commentNodeInTr = $xpath->query('.//span[@class="list_comment2"]', $article);
             $commentCount = $commentNodeInTr->length > 0 ? trim($commentNodeInTr->item(0)->textContent) : '';
-            $viewsNode = $xpath->query('.//td[contains(@class, "board_date")][last()]', $article);
+            // 조회수는 'board_date' 클래스를 가진 td의 바로 다음 td에 있습니다.
+            $viewsNode = $xpath->query('.//td[contains(@class, "board_date")]/following-sibling::td[1]', $article);
             $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
-        } elseif ($isIssueHotBoard) { // 정자게시판(인기) 파싱
+        } else { // 일반 게시판 (정치게시판 등) 파싱
             $titleNode = $xpath->query(".//a[contains(@class, 'baseList-title')]", $article)->item(0);
             if ($titleNode) {
                 $title = trim($titleNode->textContent);
                 $relativeUrl = $titleNode->getAttribute('href');
-                // URL이 'view.php?id=...' 형태이므로 앞에 경로를 붙여줍니다.
                 $url = 'https://www.ppomppu.co.kr/zboard/' . $relativeUrl;
             }
 
-            // 댓글 수는 'baseList-c' 클래스를 가진 span 태그에 있습니다.
             $commentNode = $xpath->query(".//span[contains(@class, 'baseList-c')]", $article);
             $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
 
-            // 조회수는 'baseList-views' 클래스를 가진 td 태그에 있습니다.
             $viewsNode = $xpath->query(".//td[contains(@class, 'baseList-views')]", $article);
             $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
-
-            // echo "제목: " . $title . " | 댓글 수: " . $commentCount . " | 조회 수: " . $views . "\n";
         }
 
         if ($title !== 'N/A') {
