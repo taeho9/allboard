@@ -69,13 +69,22 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
         if ($isHotBoard) {
             // HOT/인기글 게시판 파싱
             $linkNode = $xpath->query('.//a[contains(@class, "baseList-title")]', $article)->item(0);
-            $titleNode = $xpath->query('.//a[contains(@class, "baseList-title")]/span', $article)->item(0);
-            if ($titleNode) {
-                $title = trim($titleNode->textContent);
-            }
             if ($linkNode) {
                 $relativeUrl = $linkNode->getAttribute('href');
                 $url = 'https://www.ppomppu.co.kr' . $relativeUrl;
+
+                // <a> 태그의 자식 노드를 순회하여 <img> 태그 뒤의 텍스트 노드를 찾습니다.
+                $foundImage = false;
+                foreach ($linkNode->childNodes as $child) {
+                    if ($child->nodeName === 'img') {
+                        $foundImage = true;
+                        continue;
+                    }
+                    if ($foundImage && $child instanceof DOMText) {
+                        $title = trim($child->nodeValue);
+                        break; // 제목을 찾았으면 반복 중단
+                    }
+                }
             }
             $commentNode = $xpath->query('.//span[@class="list_comment2"]', $article);
             $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
