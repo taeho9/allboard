@@ -23,8 +23,8 @@
       "url": "https://www.ppomppu.co.kr/hot.php?category=1"
     },
     {
-      "name": "정치자유게시판",
-      "url": "https://www.ppomppu.co.kr/zboard/zboard.php?id=issue"
+      "name": "정자게시판(인기)",
+      "url": "https://www.ppomppu.co.kr/zboard/zboard.php?id=issue&hotlist_flag=999"
     }
   ]
 }
