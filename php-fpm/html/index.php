@@ -238,7 +238,7 @@ foreach ($communities as $siteName => $boards) {
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>제목</th>
+                                            <th style="width: 80%;">제목</th>
                                             <th class="views">조회수</th>
                                         </tr>
                                     </thead>
