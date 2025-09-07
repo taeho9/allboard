@@ -217,12 +217,16 @@ foreach ($communities as $siteName => $boards) {
         a { color: #3498db; text-decoration: none; }
         a:hover { text-decoration: underline; }
         .comment-count { color: #e74c3c; font-weight: bold; margin-left: 5px; }
+        .float-nav { position: fixed; top: 50%; right: 20px; transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; z-index: 1000; }
+        .nav-btn { width: 50px; height: 50px; background-color: #34495e; color: white; border: none; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: background-color 0.3s; }
+        .nav-btn:hover { background-color: #2c3e50; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>AllBoard - 커뮤니티 인기글 모음</h1>
 
+        <?php $siteIndex = 0; ?>
         <?php foreach ($allPostsBySite as $siteName => $boards): ?>
             <section>
                 <h2 class="site-title"><?php echo htmlspecialchars($siteName); ?></h2>
@@ -260,8 +264,54 @@ foreach ($communities as $siteName => $boards) {
                     <?php endforeach; ?>
                 </div>
             </section>
+            <?php $siteIndex++; ?>
         <?php endforeach; ?>
     </div>
+
+    <div class="float-nav">
+        <button id="nav-up" class="nav-btn">▲</button>
+        <button id="nav-down" class="nav-btn">▼</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const sections = document.querySelectorAll('section');
+            const navUp = document.getElementById('nav-up');
+            const navDown = document.getElementById('nav-down');
+            let currentSectionIndex = 0;
+
+            function scrollToSection(index) {
+                if (index >= 0 && index < sections.length) {
+                    sections[index].scrollIntoView({ behavior: 'smooth' });
+                    currentSectionIndex = index;
+                }
+            }
+
+            function findCurrentSection() {
+                let closestSectionIndex = 0;
+                let minDistance = Number.MAX_VALUE;
+
+                sections.forEach((section, index) => {
+                    const distance = Math.abs(section.getBoundingClientRect().top);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestSectionIndex = index;
+                    }
+                });
+                return closestSectionIndex;
+            }
+
+            navUp.addEventListener('click', () => {
+                let currentIdx = findCurrentSection();
+                scrollToSection(currentIdx - 1);
+            });
+
+            navDown.addEventListener('click', () => {
+                let currentIdx = findCurrentSection();
+                scrollToSection(currentIdx + 1);
+            });
+        });
+    </script>
 </body>
 </html>
 
