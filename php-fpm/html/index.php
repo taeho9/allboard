@@ -261,7 +261,7 @@ foreach ($communities as $siteName => $boards) {
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; background-color: #f4f4f9; color: #333; }
         .container { max-width: 1440px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { text-align: center; color: #2c3e50; }
-        .site-title-container { display: flex; align-items: center; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 20px; }
+        .site-title-container { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 20px; }
         .site-title { font-size: 2em; color: #34495e; margin: 0; flex-grow: 1; }
         .login-btn, .logout-btn { font-size: 0.6em; vertical-align: middle; margin-left: 10px; padding: 5px 10px; border: 1px solid #ccc; background-color: #f0f0f0; color: #333; text-decoration: none; border-radius: 4px; cursor: pointer; }
         .logout-btn { background-color: #e74c3c; color: white; border-color: #c0392b; }
@@ -269,7 +269,6 @@ foreach ($communities as $siteName => $boards) {
         .modal { display: none; position: fixed; z-index: 1001; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
         .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 400px; border-radius: 8px; }
         .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
-        .site-title { font-size: 2em; color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 20px; }
         .boards-container { display: flex; flex-wrap: wrap; gap: 20px; }
         .board-column { flex: 1; min-width: 280px; }
         .board-title { font-size: 1.5em; color: #2980b9; margin-top: 20px; margin-bottom: 15px; }
