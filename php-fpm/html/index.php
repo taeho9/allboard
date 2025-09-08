@@ -261,7 +261,8 @@ foreach ($communities as $siteName => $boards) {
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; background-color: #f4f4f9; color: #333; }
         .container { max-width: 1440px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { text-align: center; color: #2c3e50; }
-        .site-title-container { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 20px; }
+        section { margin-top: 40px; } /* 사이트 섹션 간의 상단 여백 추가 */
+        .site-title-container { display: flex; align-items: center; justify-content: space-between; background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 5px solid #3498db; }
         .site-title { font-size: 2em; color: #34495e; margin: 0; flex-grow: 1; }
         .login-btn, .logout-btn { font-size: 0.6em; vertical-align: middle; margin-left: 10px; padding: 5px 10px; border: 1px solid #ccc; background-color: #f0f0f0; color: #333; text-decoration: none; border-radius: 4px; cursor: pointer; }
         .logout-btn { background-color: #e74c3c; color: white; border-color: #c0392b; }
