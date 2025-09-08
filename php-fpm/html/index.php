@@ -129,10 +129,42 @@ $jsonFile = 'boards.json';
 // 로그인 상태 관리를 위한 세션 시작
 session_start();
 
-// 뽐뿌 로그인 요청 처리
+// 뽐뿌 로그인 요청 처리 (메인 루프와 분리)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_action']) && $_POST['login_action'] === 'ppomppu') {
-    // 로그인 로직은 아래 cURL 처리 부분에서 수행됩니다.
-    // 이 블록은 나중에 더 복잡한 사전 처리가 필요할 경우를 위해 남겨둘 수 있습니다.
+    $username = $_POST['ppomppu_id'] ?? '';
+    $password = $_POST['ppomppu_password'] ?? '';
+
+    if (!empty($username) && !empty($password)) {
+        $loginUrl = 'https://www.ppomppu.co.kr/zboard/login.php';
+        $postData = [
+            'user_id' => $username,
+            'password' => $password,
+            'auto_login' => '1',
+        ];
+
+        $cookieFile = tempnam(sys_get_temp_dir(), 'ppomppu_cookie_');
+        $_SESSION['ppomppu_cookie_file'] = $cookieFile;
+
+        $ch_login = curl_init();
+        curl_setopt($ch_login, CURLOPT_URL, $loginUrl);
+        curl_setopt($ch_login, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch_login, CURLOPT_POST, true);
+        curl_setopt($ch_login, CURLOPT_POSTFIELDS, http_build_query($postData));
+        curl_setopt($ch_login, CURLOPT_COOKIEJAR, $cookieFile);
+        curl_exec($ch_login);
+        curl_close($ch_login);
+
+        $cookieContent = file_get_contents($cookieFile);
+        if (strpos($cookieContent, 'zsess') !== false) {
+            $_SESSION['ppomppu_logged_in'] = true;
+        } else {
+            unlink($cookieFile);
+            unset($_SESSION['ppomppu_cookie_file']);
+            echo "<script>alert('로그인에 실패했습니다. 아이디 또는 비밀번호를 확인해주세요.');</script>";
+        }
+    }
+    echo "<script>window.location.href='index.php';</script>";
+    exit;
 }
 
 // 로그아웃 처리
@@ -185,47 +217,6 @@ foreach ($communities as $siteName => $boards) {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-
-        // 뽐뿌 로그인 처리 (사용자 입력 기반)
-        if ($siteName === '뽐뿌' && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_action']) && $_POST['login_action'] === 'ppomppu') {
-            $username = $_POST['ppomppu_id'] ?? '';
-            $password = $_POST['ppomppu_password'] ?? '';
-
-            if (!empty($username) && !empty($password)) {
-                $loginUrl = 'https://www.ppomppu.co.kr/zboard/login.php';
-                $postData = [
-                    'user_id' => $username,
-                    'password' => $password,
-                    'auto_login' => '1',
-                ];
-
-                // 각 사용자 세션별로 고유한 쿠키 파일 생성
-                $cookieFile = tempnam(sys_get_temp_dir(), 'ppomppu_cookie_');
-                $_SESSION['ppomppu_cookie_file'] = $cookieFile;
-
-                curl_setopt($ch, CURLOPT_URL, $loginUrl);
-                curl_setopt($ch, CURLOPT_POST, true);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
-                curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieFile);
-                curl_exec($ch); // 로그인 요청 실행
-
-                // 로그인 성공 여부 확인
-                $cookieContent = file_get_contents($cookieFile);
-                // 뽐뿌는 로그인 성공 시 'zsess'라는 쿠키를 생성합니다. 이 쿠키가 있는지 확인합니다.
-                if (strpos($cookieContent, 'zsess') !== false) {
-                    $_SESSION['ppomppu_logged_in'] = true; // 로그인 성공 플래그 설정
-                    header('Location: index.php'); // 성공 시 리다이렉트
-                    exit;
-                } else {
-                    // 로그인 실패 시 생성했던 임시 쿠키 파일 삭제
-                    unlink($cookieFile);
-                    unset($_SESSION['ppomppu_cookie_file']);
-                    // 실패 알림 후 현재 페이지로 복귀
-                    echo "<script>alert('로그인에 실패했습니다. 아이디 또는 비밀번호를 확인해주세요.'); window.location.href='index.php';</script>";
-                    exit;
-                }
-            }
-        }
 
         // 저장된 뽐뿌 쿠키가 있다면 사용
         if ($siteName === '뽐뿌' && isset($_SESSION['ppomppu_cookie_file']) && file_exists($_SESSION['ppomppu_cookie_file'])) {
