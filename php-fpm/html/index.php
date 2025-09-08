@@ -138,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_action']) && $_
 // 로그아웃 처리
 if (isset($_GET['logout']) && $_GET['logout'] === 'ppomppu') {
     if (isset($_SESSION['ppomppu_cookie_file']) && file_exists($_SESSION['ppomppu_cookie_file'])) {
-        unlink($_SESSION['ppomppu_cookie_file']); // 쿠키 파일 삭제
+        unlink($_SESSION['ppomppu_cookie_file']); // 로그 아웃 시 쿠키 파일 삭제
     }
     unset($_SESSION['ppomppu_cookie_file']); // 세션 변수 삭제
     unset($_SESSION['ppomppu_logged_in']);   // 로그인 상태 플래그 삭제
@@ -147,7 +147,6 @@ if (isset($_GET['logout']) && $_GET['logout'] === 'ppomppu') {
     header('Location: index.php');
     exit;
 }
-
 
 // 최종 결과를 담을 빈 배열 초기화
 $allPostsBySite = [];
@@ -208,10 +207,23 @@ foreach ($communities as $siteName => $boards) {
                 curl_setopt($ch, CURLOPT_POST, true);
                 curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
                 curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieFile);
-                curl_exec($ch);
-                $_SESSION['ppomppu_logged_in'] = true; // 로그인 상태 플래그 설정
-                header('Location: index.php'); // 로그인 후 리다이렉트
-                exit;
+                curl_exec($ch); // 로그인 요청 실행
+
+                // 로그인 성공 여부 확인
+                $cookieContent = file_get_contents($cookieFile);
+                // 뽐뿌는 로그인 성공 시 'zsess'라는 쿠키를 생성합니다. 이 쿠키가 있는지 확인합니다.
+                if (strpos($cookieContent, 'zsess') !== false) {
+                    $_SESSION['ppomppu_logged_in'] = true; // 로그인 성공 플래그 설정
+                    header('Location: index.php'); // 성공 시 리다이렉트
+                    exit;
+                } else {
+                    // 로그인 실패 시 생성했던 임시 쿠키 파일 삭제
+                    unlink($cookieFile);
+                    unset($_SESSION['ppomppu_cookie_file']);
+                    // 실패 알림 후 현재 페이지로 복귀
+                    echo "<script>alert('로그인에 실패했습니다. 아이디 또는 비밀번호를 확인해주세요.'); window.location.href='index.php';</script>";
+                    exit;
+                }
             }
         }
 
