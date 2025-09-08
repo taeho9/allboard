@@ -126,6 +126,29 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
 // --- 메인 로직 시작 ---
 $jsonFile = 'boards.json';
 
+// 로그인 상태 관리를 위한 세션 시작
+session_start();
+
+// 뽐뿌 로그인 요청 처리
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_action']) && $_POST['login_action'] === 'ppomppu') {
+    // 로그인 로직은 아래 cURL 처리 부분에서 수행됩니다.
+    // 이 블록은 나중에 더 복잡한 사전 처리가 필요할 경우를 위해 남겨둘 수 있습니다.
+}
+
+// 로그아웃 처리
+if (isset($_GET['logout']) && $_GET['logout'] === 'ppomppu') {
+    if (isset($_SESSION['ppomppu_cookie_file']) && file_exists($_SESSION['ppomppu_cookie_file'])) {
+        unlink($_SESSION['ppomppu_cookie_file']); // 쿠키 파일 삭제
+    }
+    unset($_SESSION['ppomppu_cookie_file']); // 세션 변수 삭제
+    unset($_SESSION['ppomppu_logged_in']);   // 로그인 상태 플래그 삭제
+
+    // 로그아웃 후 현재 페이지로 리다이렉트
+    header('Location: index.php');
+    exit;
+}
+
+
 // 최종 결과를 담을 빈 배열 초기화
 $allPostsBySite = [];
 
@@ -163,6 +186,40 @@ foreach ($communities as $siteName => $boards) {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+
+        // 뽐뿌 로그인 처리 (사용자 입력 기반)
+        if ($siteName === '뽐뿌' && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_action']) && $_POST['login_action'] === 'ppomppu') {
+            $username = $_POST['ppomppu_id'] ?? '';
+            $password = $_POST['ppomppu_password'] ?? '';
+
+            if (!empty($username) && !empty($password)) {
+                $loginUrl = 'https://www.ppomppu.co.kr/zboard/login.php';
+                $postData = [
+                    'user_id' => $username,
+                    'password' => $password,
+                    'auto_login' => '1',
+                ];
+
+                // 각 사용자 세션별로 고유한 쿠키 파일 생성
+                $cookieFile = tempnam(sys_get_temp_dir(), 'ppomppu_cookie_');
+                $_SESSION['ppomppu_cookie_file'] = $cookieFile;
+
+                curl_setopt($ch, CURLOPT_URL, $loginUrl);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
+                curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieFile);
+                curl_exec($ch);
+                $_SESSION['ppomppu_logged_in'] = true; // 로그인 상태 플래그 설정
+                header('Location: index.php'); // 로그인 후 리다이렉트
+                exit;
+            }
+        }
+
+        // 저장된 뽐뿌 쿠키가 있다면 사용
+        if ($siteName === '뽐뿌' && isset($_SESSION['ppomppu_cookie_file']) && file_exists($_SESSION['ppomppu_cookie_file'])) {
+            curl_setopt($ch, CURLOPT_COOKIEFILE, $_SESSION['ppomppu_cookie_file']);
+        }
+
         $html = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
@@ -204,6 +261,14 @@ foreach ($communities as $siteName => $boards) {
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; background-color: #f4f4f9; color: #333; }
         .container { max-width: 1440px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { text-align: center; color: #2c3e50; }
+        .site-title-container { display: flex; align-items: center; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 20px; }
+        .site-title { font-size: 2em; color: #34495e; margin: 0; flex-grow: 1; }
+        .login-btn, .logout-btn { font-size: 0.6em; vertical-align: middle; margin-left: 10px; padding: 5px 10px; border: 1px solid #ccc; background-color: #f0f0f0; color: #333; text-decoration: none; border-radius: 4px; cursor: pointer; }
+        .logout-btn { background-color: #e74c3c; color: white; border-color: #c0392b; }
+        /* 로그인 모달 스타일 */
+        .modal { display: none; position: fixed; z-index: 1001; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 400px; border-radius: 8px; }
+        .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
         .site-title { font-size: 2em; color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 20px; }
         .boards-container { display: flex; flex-wrap: wrap; gap: 20px; }
         .board-column { flex: 1; min-width: 280px; }
@@ -229,7 +294,16 @@ foreach ($communities as $siteName => $boards) {
         <?php $siteIndex = 0; ?>
         <?php foreach ($allPostsBySite as $siteName => $boards): ?>
             <section>
-                <h2 class="site-title"><?php echo htmlspecialchars($siteName); ?></h2>
+                <div class="site-title-container">
+                    <h2 class="site-title"><?php echo htmlspecialchars($siteName); ?></h2>
+                    <?php if ($siteName === '뽐뿌'): ?>
+                        <?php if (isset($_SESSION['ppomppu_logged_in']) && $_SESSION['ppomppu_logged_in']): ?>
+                            <a href="?logout=ppomppu" class="logout-btn">로그아웃</a>
+                        <?php else: ?>
+                            <button id="ppomppu-login-btn" class="login-btn">로그인</button>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </div>
 
                 <div class="boards-container">
                     <?php foreach ($boards as $boardName => $posts): ?>
@@ -268,6 +342,26 @@ foreach ($communities as $siteName => $boards) {
         <?php endforeach; ?>
     </div>
 
+    <!-- 뽐뿌 로그인 모달 -->
+    <div id="ppomppu-login-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h3>뽐뿌 로그인</h3>
+            <form action="index.php" method="post">
+                <input type="hidden" name="login_action" value="ppomppu">
+                <div style="margin-bottom: 10px;">
+                    <label for="ppomppu_id">아이디:</label>
+                    <input type="text" id="ppomppu_id" name="ppomppu_id" required style="width: 95%; padding: 8px;">
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label for="ppomppu_password">비밀번호:</label>
+                    <input type="password" id="ppomppu_password" name="ppomppu_password" required style="width: 95%; padding: 8px;">
+                </div>
+                <button type="submit" style="padding: 10px 20px;">로그인</button>
+            </form>
+        </div>
+    </div>
+
     <div class="float-nav">
         <button id="nav-up" class="nav-btn">▲</button>
         <button id="nav-down" class="nav-btn">▼</button>
@@ -275,6 +369,27 @@ foreach ($communities as $siteName => $boards) {
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            // 로그인 모달 스크립트
+            const modal = document.getElementById('ppomppu-login-modal');
+            const btn = document.getElementById('ppomppu-login-btn');
+            const span = document.getElementsByClassName('close-btn')[0];
+
+            if (btn) {
+                btn.onclick = function() {
+                    modal.style.display = 'block';
+                }
+            }
+            if (span) {
+                span.onclick = function() {
+                    modal.style.display = 'none';
+                }
+            }
+            window.onclick = function(event) {
+                if (event.target == modal) {
+                    modal.style.display = 'none';
+                }
+            }
+
             const sections = document.querySelectorAll('section');
             const navUp = document.getElementById('nav-up');
             const navDown = document.getElementById('nav-down');
