@@ -218,8 +218,8 @@ foreach ($communities as $siteName => $boards) {
         .board-column { flex: 1; min-width: 280px; }
         .board-title { font-size: 1.5em; color: #2980b9; margin-top: 20px; margin-bottom: 15px; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background-color: #ecf0f1; }
+        th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #ddd; font-size: 0.9em; } /* 행간 여백과 폰트 크기 조정 */
+        th { background-color: #ecf0f1; font-weight: normal; }
         td { word-break: break-all; } /* 긴 제목이 셀을 넘어가지 않도록 처리 */
         tr:hover { background-color: #f5f5f5; }
         td.views { text-align: center; width: 80px; }
