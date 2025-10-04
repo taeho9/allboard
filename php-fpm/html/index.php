@@ -216,14 +216,14 @@ foreach ($communities as $siteName => $boards) {
         .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
         .boards-container { display: flex; flex-wrap: wrap; gap: 20px; }
         .board-column { flex: 1; min-width: 280px; }
-        .board-title { font-size: 1.5em; color: #2980b9; margin-top: 20px; margin-bottom: 15px; }
+    .board-title { font-size: 1.5em; color: #1a1a1a; margin-top: 20px; margin-bottom: 15px; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #ddd; font-size: 0.9em; } /* 행간 여백과 폰트 크기 조정 */
         th { background-color: #ecf0f1; font-weight: normal; }
         td { word-break: break-all; } /* 긴 제목이 셀을 넘어가지 않도록 처리 */
         tr:hover { background-color: #f5f5f5; }
         td.views { text-align: center; width: 80px; }
-        a { color: #3498db; text-decoration: none; }
+    a { color: #000000; text-decoration: none; }
         a:hover { text-decoration: underline; }
         .comment-count { color: #e74c3c; font-weight: bold; margin-left: 5px; }
         .float-nav { position: fixed; top: 50%; right: 20px; transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; z-index: 1000; }
