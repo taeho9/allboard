@@ -229,6 +229,11 @@ foreach ($communities as $siteName => $boards) {
         .float-nav { position: fixed; top: 50%; right: 20px; transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; z-index: 1000; }
         .nav-btn { width: 50px; height: 50px; background-color: #34495e; color: white; border: none; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: background-color 0.3s; }
         .nav-btn:hover { background-color: #2c3e50; }
+        @media (max-width: 768px) {
+            body { padding: 5px; }
+            .container { padding: 10px 5px; }
+            th, td { padding: 8px 2px; }
+        }
     </style>
 </head>
 <body>
