@@ -26,5 +26,19 @@
       "name": "정치자유게시판",
       "url": "https://www.ppomppu.co.kr/zboard/zboard.php?id=issue"
     }
+  ],
+  "보배드림": [
+    {
+      "name": "베스트글모음",
+      "url": "https://www.bobaedream.co.kr/list?code=best"
+    },
+    {
+      "name": "자유게시판",
+      "url": "https://www.bobaedream.co.kr/list?code=freeb"
+    },
+    {
+      "name": "신유머/이슈",
+      "url": "https://www.bobaedream.co.kr/list?code=humor"
+    }
   ]
 }
