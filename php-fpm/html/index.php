@@ -33,6 +33,9 @@ function parseClien(DOMXPath $xpath): array
                 'title' => $title,
                 'url' => $url,
             ];
+            if (count($posts) >= 20) {
+                break;
+            }
         }
     }
     return $posts;
@@ -117,6 +120,61 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
                 'title' => $title,
                 'url' => $url,
             ];
+            if (count($posts) >= 20) {
+                break;
+            }
+        }
+    }
+    return $posts;
+}
+
+/**
+ * 보배드림 게시판 파싱 함수
+ * @param DOMXPath $xpath
+ * @return array
+ */
+function parseBobaedream(DOMXPath $xpath): array
+{
+    $posts = [];
+    $articles = $xpath->query("//table[contains(@class, 'clistTable02')]//tbody//tr");
+
+    foreach ($articles as $article) {
+        $titleNode = $xpath->query(".//a[contains(@class, 'bsubject')]", $article);
+        if ($titleNode->length === 0) {
+            continue;
+        }
+
+        $linkElement = $titleNode->item(0);
+        $relativeUrl = $linkElement->getAttribute('href');
+        $url = 'https://www.bobaedream.co.kr' . $relativeUrl;
+
+        $commentCount = '';
+        $commentNode = $xpath->query(".//span[@class='tot_reply']", $linkElement);
+        if ($commentNode->length > 0) {
+            $commentCount = trim($commentNode->item(0)->textContent);
+        }
+
+        $title = '';
+        foreach ($linkElement->childNodes as $child) {
+            if ($child->nodeName === 'span' && strpos($child->getAttribute('class'), 'tot_reply') !== false) {
+                continue;
+            }
+            $title .= $child->textContent;
+        }
+        $title = trim($title);
+
+        $viewsNode = $xpath->query(".//td[contains(@class, 'count')]", $article);
+        $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
+
+        $posts[] = [
+            'views' => $views,
+            'comment_count' => $commentCount,
+            'title' => $title,
+            'url' => $url,
+        ];
+
+        if (count($posts) >= 20) {
+            break;
         }
     }
     return $posts;
@@ -189,6 +247,8 @@ foreach ($communities as $siteName => $boards) {
             $allPostsBySite[$siteName][$boardName] = parseClien($xpath);
         } elseif ($siteName === '뽐뿌') {
             $allPostsBySite[$siteName][$boardName] = parsePpomppu($xpath, $boardUrl);
+        } elseif ($siteName === '보배드림') {
+            $allPostsBySite[$siteName][$boardName] = parseBobaedream($xpath);
         }
     }
 }
