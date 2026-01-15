@@ -149,7 +149,8 @@ function parseBobaedream(DOMXPath $xpath): array
         $url = 'https://www.bobaedream.co.kr' . $relativeUrl;
 
         $commentCount = '';
-        $commentNode = $xpath->query(".//span[contains(@class, 'tot_reply')]", $article);
+        // 댓글 개수 파싱 수정: span 또는 strong 태그의 tot_reply 또는 totreply 클래스 확인
+        $commentNode = $xpath->query(".//*[contains(@class, 'tot_reply') or contains(@class, 'totreply')]", $article);
         if ($commentNode->length > 0) {
             $commentCount = trim($commentNode->item(0)->textContent);
             $commentCount = preg_replace('/[^0-9]/', '', $commentCount);
@@ -157,7 +158,7 @@ function parseBobaedream(DOMXPath $xpath): array
 
         $title = '';
         foreach ($linkElement->childNodes as $child) {
-            if ($child->nodeName === 'span' && strpos($child->getAttribute('class'), 'tot_reply') !== false) {
+            if ($child instanceof DOMElement && (strpos($child->getAttribute('class'), 'tot_reply') !== false || strpos($child->getAttribute('class'), 'totreply') !== false)) {
                 continue;
             }
             $title .= $child->textContent;
