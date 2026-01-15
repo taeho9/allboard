@@ -149,9 +149,10 @@ function parseBobaedream(DOMXPath $xpath): array
         $url = 'https://www.bobaedream.co.kr' . $relativeUrl;
 
         $commentCount = '';
-        $commentNode = $xpath->query(".//span[@class='tot_reply']", $article);
+        $commentNode = $xpath->query(".//span[contains(@class, 'tot_reply')]", $article);
         if ($commentNode->length > 0) {
             $commentCount = trim($commentNode->item(0)->textContent);
+            $commentCount = preg_replace('/[^0-9]/', '', $commentCount);
         }
 
         $title = '';
@@ -201,6 +202,10 @@ function getTierIconHtml(string $viewsStr): string
         $lowerStr = strtolower($viewsStr);
         if (strpos($lowerStr, 'k') !== false) {
             $numberPart = (float)preg_replace('/[^0-9.]/', '', $lowerStr);
+            $views = (int)($numberPart * 1000);
+        } elseif (strpos($viewsStr, '.') !== false) {
+            // 'k'가 텍스트에 포함되지 않았지만 소수점이 있는 경우 (예: "21.3" -> 21300)
+            $numberPart = (float)preg_replace('/[^0-9.]/', '', $viewsStr);
             $views = (int)($numberPart * 1000);
         } else {
             $views = (int)preg_replace('/[^0-9]/', '', $viewsStr);
