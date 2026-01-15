@@ -149,9 +149,10 @@ function parseBobaedream(DOMXPath $xpath): array
         $url = 'https://www.bobaedream.co.kr' . $relativeUrl;
 
         $commentCount = '';
-        $commentNode = $xpath->query(".//span[@class='tot_reply']", $linkElement);
+        $commentNode = $xpath->query(".//span[contains(@class, 'tot_reply')]", $article);
         if ($commentNode->length > 0) {
             $commentCount = trim($commentNode->item(0)->textContent);
+            $commentCount = preg_replace('/[^0-9]/', '', $commentCount);
         }
 
         $title = '';
@@ -187,24 +188,64 @@ function parseBobaedream(DOMXPath $xpath): array
  */
 function getTierIconHtml(string $viewsStr): string
 {
-    $views = (int)str_replace([',', 'N/A', ' '], '', $viewsStr);
+    $viewsStr = trim($viewsStr);
+    $isVote = false;
+    $views = 0;
+
+    // 추천수 형식 확인 (예: "40 - 0")
+    if (strpos($viewsStr, '-') !== false) {
+        $parts = explode('-', $viewsStr);
+        $views = (int)preg_replace('/[^0-9]/', '', $parts[0]);
+        $isVote = true;
+    } else {
+        // 조회수 형식 확인 (예: "11.1 k")
+        $lowerStr = strtolower($viewsStr);
+        if (strpos($lowerStr, 'k') !== false) {
+            $numberPart = (float)preg_replace('/[^0-9.]/', '', $lowerStr);
+            $views = (int)($numberPart * 1000);
+        } elseif (strpos($viewsStr, '.') !== false) {
+            // 'k'가 텍스트에 포함되지 않았지만 소수점이 있는 경우 (예: "21.3" -> 21300)
+            $numberPart = (float)preg_replace('/[^0-9.]/', '', $viewsStr);
+            $views = (int)($numberPart * 1000);
+        } else {
+            $views = (int)preg_replace('/[^0-9]/', '', $viewsStr);
+        }
+    }
     
     $class = '';
     $title = '';
     
-    if ($views >= 20000) {
-        $class = 'tier-1';
-        $title = 'SuperHit (20,000+)';
-    } elseif ($views >= 10000) {
-        $class = 'tier-2';
-        $title = 'BigHit (10,000+)';
-    } elseif ($views >= 6000) {
-        $class = 'tier-3';
-        $title = 'Hit! (6,000+)';
-    } elseif ($views >= 3000) {
-        $class = 'tier-4';
-        $title = 'Cool! (3,000+)';
+    if ($isVote) {
+        if ($views >= 200) {
+            $class = 'tier-1';
+            $title = 'SuperHit (200+)';
+        } elseif ($views >= 100) {
+            $class = 'tier-2';
+            $title = 'BigHit (100+)';
+        } elseif ($views >= 50) {
+            $class = 'tier-3';
+            $title = 'Hit! (50+)';
+        } elseif ($views >= 10) {
+            $class = 'tier-4';
+            $title = 'Cool! (10+)';
+        }
     } else {
+        if ($views >= 20000) {
+            $class = 'tier-1';
+            $title = 'SuperHit (20,000+)';
+        } elseif ($views >= 10000) {
+            $class = 'tier-2';
+            $title = 'BigHit (10,000+)';
+        } elseif ($views >= 6000) {
+            $class = 'tier-3';
+            $title = 'Hit! (6,000+)';
+        } elseif ($views >= 3000) {
+            $class = 'tier-4';
+            $title = 'Cool! (3,000+)';
+        }
+    }
+
+    if ($class === '') {
         return '';
     }
 
