@@ -180,6 +180,41 @@ function parseBobaedream(DOMXPath $xpath): array
     return $posts;
 }
 
+/**
+ * 조회수에 따른 등급 아이콘 HTML 생성 함수
+ * @param string $viewsStr
+ * @return string
+ */
+function getTierIconHtml(string $viewsStr): string
+{
+    $views = (int)str_replace([',', 'N/A', ' '], '', $viewsStr);
+    
+    $class = '';
+    $title = '';
+    
+    if ($views >= 20000) {
+        $class = 'tier-1';
+        $title = 'SuperHit (20,000+)';
+    } elseif ($views >= 10000) {
+        $class = 'tier-2';
+        $title = 'BigHit (10,000+)';
+    } elseif ($views >= 6000) {
+        $class = 'tier-3';
+        $title = 'Hit! (6,000+)';
+    } elseif ($views >= 3000) {
+        $class = 'tier-4';
+        $title = 'Cool! (3,000+)';
+    } else {
+        return '';
+    }
+
+    return sprintf(
+        '<svg class="tier-icon %s" viewBox="0 0 24 24" title="%s"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>',
+        $class,
+        $title
+    );
+}
+
 
 // --- 메인 로직 시작 ---
 $jsonFile = 'boards.json';
@@ -294,6 +329,12 @@ foreach ($communities as $siteName => $boards) {
             .container { padding: 10px 5px; }
             th, td { padding: 8px 2px; }
         }
+        /* 등급 아이콘 스타일 */
+        .tier-icon { width: 15px; height: 15px; vertical-align: text-bottom; margin-right: 4px; }
+        .tier-1 { fill: #9b59b6; } /* 1등급: 보라색 */
+        .tier-2 { fill: #e74c3c; } /* 2등급: 빨간색 */
+        .tier-3 { fill: #e67e22; } /* 3등급: 주황색 */
+        .tier-4 { fill: #2ecc71; } /* 4등급: 초록색 */
     </style>
 </head>
 <body>
@@ -325,6 +366,7 @@ foreach ($communities as $siteName => $boards) {
                                         <?php foreach ($posts as $post): ?>
                                             <tr>
                                                 <td>
+                                                    <?php echo getTierIconHtml($post['views']); ?>
                                                     <a href="<?php echo htmlspecialchars($post['url']); ?>" target="_blank"><?php echo htmlspecialchars($post['title']); ?></a>
                                                     <?php if (!empty($post['comment_count'])): ?>
                                                         <span class="comment-count">[<?php echo htmlspecialchars($post['comment_count']); ?>]</span>
