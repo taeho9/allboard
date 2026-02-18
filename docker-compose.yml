@@ -32,5 +32,3 @@ services:
 networks:
   reverse_proxy:
     external: true
-
-# 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
