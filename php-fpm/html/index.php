@@ -686,185 +686,740 @@ foreach ($communities as $siteName => $boards) {
 }
 
 // 4. 최종 결과를 HTML 페이지로 출력
+$currentTime = date('Y-m-d H:i:s');
 ?>
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AllBoard - 커뮤니티 인기글 모음</title>
+    <title>AllBoard - 커뮤니티 실시간 인기글 모음</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; background-color: #f4f4f9; color: #333; }
-        .container { max-width: 1440px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: #2c3e50; }
-        section { margin-top: 40px; }
-        .site-title-container { display: flex; align-items: center; justify-content: space-between; background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 5px solid #3498db; }
-        .site-title { font-size: 2em; color: #34495e; margin: 0; flex-grow: 1; }
-        .login-btn, .logout-btn { font-size: 0.6em; vertical-align: middle; margin-left: 10px; padding: 5px 10px; border: 1px solid #ccc; background-color: #f0f0f0; color: #333; text-decoration: none; border-radius: 4px; cursor: pointer; }
-        .logout-btn { background-color: #e74c3c; color: white; border-color: #c0392b; }
-        .modal { display: none; position: fixed; z-index: 1001; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
-        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 400px; border-radius: 8px; }
-        .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
-        .boards-container { display: flex; flex-wrap: wrap; gap: 20px; }
-        .board-column { flex: 1; min-width: 320px; }
-        .board-title { font-size: 1.3em; color: #1a1a1a; margin-top: 20px; margin-bottom: 15px; }
-        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        th, td { padding: 8px 8px; text-align: left; border-bottom: 1px solid #ddd; font-size: 0.9em; }
-        th { background-color: #ecf0f1; font-weight: normal; }
-        td { word-break: break-all; }
-        tr:hover { background-color: #f5f5f5; }
-        td.views { text-align: center; width: 75px; font-size: 0.85em; }
-        td.category-col { width: 85px; text-align: center; }
-        .category-badge { display: inline-block; padding: 2px 6px; font-size: 0.8em; font-weight: 500; background-color: #e8f4fd; color: #2980b9; border-radius: 4px; border: 1px solid #d4e6f1; white-space: nowrap; max-width: 80px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
-        a { color: #000000; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .comment-count { color: #e74c3c; font-weight: bold; margin-left: 5px; font-size: 0.85em; }
-        .float-nav { position: fixed; top: 50%; right: 20px; transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; z-index: 1000; }
-        .nav-btn { width: 50px; height: 50px; background-color: #34495e; color: white; border: none; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: background-color 0.3s; }
-        .nav-btn:hover { background-color: #2c3e50; }
-        @media (max-width: 768px) {
-            body { padding: 5px; }
-            .container { padding: 10px 5px; }
-            th, td { padding: 6px 2px; font-size: 0.85em; }
-            td.category-col { width: 65px; }
-            .category-badge { max-width: 60px; font-size: 0.75em; padding: 1px 3px; }
-            td.views { width: 60px; }
+        :root {
+            --bg-body: #f1f5f9;
+            --bg-header: #ffffff;
+            --bg-card: #ffffff;
+            --bg-card-header: #f8fafc;
+            --bg-hover: #f1f5f9;
+            --bg-active-tab: #ffffff;
+            --bg-inactive-tab: #e2e8f0;
+            --bg-badge: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --text-visited: #94a3b8;
+            --border-color: #e2e8f0;
+            --border-subtle: #cbd5e1;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+            
+            /* 커뮤니티 테마 색상 */
+            --color-clien: #1e88e5;
+            --color-clien-light: #e3f2fd;
+            --color-ppom: #ea580c;
+            --color-ppom-light: #ffedd5;
+            --color-bobae: #0284c7;
+            --color-bobae-light: #e0f2fe;
+            --color-comment-hot: #ef4444;
+            --color-comment-warm: #f97316;
+            --color-comment-normal: #64748b;
         }
-        /* 등급 아이콘 스타일 */
-        .tier-icon { width: 15px; height: 15px; vertical-align: text-bottom; margin-right: 4px; }
-        .tier-1 { fill: #9b59b6; } /* 1등급: 보라색 */
-        .tier-2 { fill: #e74c3c; } /* 2등급: 빨간색 */
-        .tier-3 { fill: #e67e22; } /* 3등급: 주황색 */
-        .tier-4 { fill: #2ecc71; } /* 4등급: 초록색 */
+
+        [data-theme="dark"] {
+            --bg-body: #0f172a;
+            --bg-header: #1e293b;
+            --bg-card: #1e293b;
+            --bg-card-header: #182234;
+            --bg-hover: #27354a;
+            --bg-active-tab: #27354a;
+            --bg-inactive-tab: #0f172a;
+            --bg-badge: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #64748b;
+            --text-visited: #64748b;
+            --border-color: #334155;
+            --border-subtle: #475569;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+
+            --color-clien-light: rgba(30, 136, 229, 0.15);
+            --color-ppom-light: rgba(234, 88, 12, 0.15);
+            --color-bobae-light: rgba(2, 132, 199, 0.15);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            line-height: 1.5;
+            transition: background-color 0.2s, color 0.2s;
+            padding-bottom: 30px;
+        }
+
+        /* Top Navbar */
+        .header {
+            background-color: var(--bg-header);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: var(--shadow-sm);
+        }
+        .header-content {
+            max-width: 1920px;
+            margin: 0 auto;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-decoration: none;
+            letter-spacing: -0.5px;
+        }
+        .brand-badge {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: #ffffff;
+            font-size: 0.75rem;
+            padding: 2px 7px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+        .header-tools {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .update-time {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn-tool {
+            background-color: var(--bg-card-header);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+        .btn-tool:hover {
+            background-color: var(--bg-hover);
+            color: var(--text-primary);
+            border-color: var(--border-subtle);
+        }
+        .btn-tool.active {
+            background-color: #3b82f6;
+            color: #ffffff;
+            border-color: #3b82f6;
+        }
+
+        /* 메인 레이아웃 (3컬럼 멀티 뷰) */
+        .main-container {
+            max-width: 1920px;
+            margin: 16px auto 0;
+            padding: 0 16px;
+        }
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            align-items: start;
+        }
+
+        /* 커뮤니티 컬럼 카드 */
+        .community-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: var(--shadow-md);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .community-card:hover {
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* 커뮤니티별 상단 바 테마 */
+        .community-card.site-clien { border-top: 4px solid var(--color-clien); }
+        .community-card.site-ppom { border-top: 4px solid var(--color-ppom); }
+        .community-card.site-bobae { border-top: 4px solid var(--color-bobae); }
+
+        .community-card-header {
+            padding: 12px 16px 8px;
+            background-color: var(--bg-card-header);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .site-meta-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .site-name-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .site-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .site-clien .site-dot { background-color: var(--color-clien); box-shadow: 0 0 6px rgba(30,136,229,0.5); }
+        .site-ppom .site-dot { background-color: var(--color-ppom); box-shadow: 0 0 6px rgba(234,88,12,0.5); }
+        .site-bobae .site-dot { background-color: var(--color-bobae); box-shadow: 0 0 6px rgba(2,132,199,0.5); }
+
+        .site-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.3px;
+        }
+        .site-link-btn {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background-color: var(--bg-badge);
+            transition: all 0.15s;
+        }
+        .site-link-btn:hover {
+            color: var(--text-primary);
+        }
+
+        /* 탭 버튼 그룹 */
+        .tab-group {
+            display: flex;
+            gap: 6px;
+            background-color: var(--bg-inactive-tab);
+            padding: 3px;
+            border-radius: 8px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 6px 8px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: all 0.15s ease;
+        }
+        .tab-btn:hover {
+            color: var(--text-primary);
+        }
+        .tab-btn.active {
+            background-color: var(--bg-active-tab);
+            color: var(--text-primary);
+            box-shadow: var(--shadow-sm);
+        }
+        .site-clien .tab-btn.active { color: var(--color-clien); }
+        .site-ppom .tab-btn.active { color: var(--color-ppom); }
+        .site-bobae .tab-btn.active { color: var(--color-bobae); }
+
+        /* 게시물 리스트 테이블 */
+        .board-panel {
+            display: none;
+        }
+        .board-panel.active {
+            display: block;
+        }
+        .posts-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        .post-row {
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.12s;
+            height: 38px;
+        }
+        .post-row:last-child {
+            border-bottom: none;
+        }
+        .post-row:hover {
+            background-color: var(--bg-hover);
+        }
+
+        .col-title {
+            padding: 6px 10px;
+            vertical-align: middle;
+            overflow: hidden;
+        }
+        .title-container {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        .post-rank {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            min-width: 18px;
+            text-align: center;
+            display: inline-block;
+        }
+        .post-rank.top3 {
+            color: #f59e0b;
+        }
+        
+        .category-tag {
+            font-size: 0.72rem;
+            padding: 1px 5px;
+            border-radius: 4px;
+            background-color: var(--bg-badge);
+            color: var(--text-secondary);
+            font-weight: 500;
+            white-space: nowrap;
+            flex-shrink: 0;
+            max-width: 65px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .post-link {
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 0.86rem;
+            font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex-grow: 1;
+        }
+        .post-link:hover {
+            text-decoration: underline;
+            color: #2563eb;
+        }
+        .post-row.visited .post-link {
+            color: var(--text-visited) !important;
+        }
+        .post-row.visited .post-rank {
+            opacity: 0.6;
+        }
+
+        /* 댓글수 뱃지 */
+        .comment-badge {
+            font-size: 0.74rem;
+            font-weight: 700;
+            padding: 1px 5px;
+            border-radius: 10px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            line-height: 1.2;
+            margin-left: 2px;
+        }
+        .comment-badge.hot {
+            background-color: #fee2e2;
+            color: #dc2626;
+        }
+        .comment-badge.warm {
+            background-color: #ffedd5;
+            color: #ea580c;
+        }
+        .comment-badge.normal {
+            background-color: var(--bg-badge);
+            color: var(--color-comment-normal);
+        }
+        [data-theme="dark"] .comment-badge.hot {
+            background-color: rgba(220, 38, 38, 0.25);
+            color: #f87171;
+        }
+        [data-theme="dark"] .comment-badge.warm {
+            background-color: rgba(234, 88, 12, 0.25);
+            color: #fb923c;
+        }
+
+        /* 조회수 열 */
+        .col-views {
+            width: 68px;
+            padding: 6px 10px 6px 4px;
+            text-align: right;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            vertical-align: middle;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* 티어 아이콘 */
+        .tier-icon {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+            vertical-align: middle;
+        }
+        .tier-1 { fill: #a855f7; filter: drop-shadow(0 0 2px rgba(168,85,247,0.5)); } /* 보라 */
+        .tier-2 { fill: #ef4444; filter: drop-shadow(0 0 2px rgba(239,68,68,0.5)); } /* 빨강 */
+        .tier-3 { fill: #f97316; } /* 주황 */
+        .tier-4 { fill: #10b981; } /* 초록 */
+
+        .empty-posts {
+            padding: 30px 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        /* 반응형 모바일/태블릿 */
+        @media (max-width: 1200px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            .header-content {
+                padding: 10px 16px;
+            }
+        }
+
+        /* 모드 전환: 전체 펼쳐보기 모드 */
+        .expand-mode .tab-group {
+            display: none;
+        }
+        .expand-mode .board-panel {
+            display: block !important;
+            border-bottom: 8px solid var(--bg-body);
+        }
+        .expand-mode .board-panel-title {
+            display: block;
+            padding: 8px 16px;
+            background-color: var(--bg-inactive-tab);
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .board-panel-title {
+            display: none;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>AllBoard - 커뮤니티 인기글 모음</h1>
+    <header class="header">
+        <div class="header-content">
+            <a href="index.php" class="brand">
+                <span>AllBoard</span>
+                <span class="brand-badge">3대 커뮤니티</span>
+            </a>
 
-        <?php $siteIndex = 0; ?>
-        <?php foreach ($allPostsBySite as $siteName => $boards): ?>
-            <section id="site-<?php echo $siteIndex; ?>">
-                <div class="site-title-container">
-                    <h2 class="site-title"><?php echo htmlspecialchars($siteName); ?></h2>
+            <div class="header-tools">
+                <div class="update-time" title="데이터 갱신 시각">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    <span><?php echo $currentTime; ?></span>
                 </div>
 
-                <div class="boards-container">
-                    <?php foreach ($boards as $boardName => $boardData): ?>
-                        <?php 
-                            $boardUrl = is_array($boardData) && isset($boardData['url']) ? $boardData['url'] : '';
-                            $posts = is_array($boardData) && isset($boardData['posts']) ? $boardData['posts'] : (is_array($boardData) ? $boardData : []);
-                            
-                            // 카테고리(게시판명)가 존재하는지 확인
-                            $hasCategory = false;
-                            foreach ($posts as $p) {
-                                if (!empty($p['category'])) {
-                                    $hasCategory = true;
-                                    break;
-                                }
-                            }
-                        ?>
-                        <div class="board-column">
-                            <h3 class="board-title">
-                                <?php if (!empty($boardUrl)): ?>
-                                    <a href="<?php echo htmlspecialchars($boardUrl); ?>" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">
-                                        <?php echo htmlspecialchars($boardName); ?> ↗
-                                    </a>
-                                <?php else: ?>
-                                    <?php echo htmlspecialchars($boardName); ?>
-                                <?php endif; ?>
-                            </h3>
-                            <?php if (empty($posts)): ?>
-                                <p style="color: #888; font-size: 0.9em; padding: 10px 0;">게시물을 불러올 수 없거나 목록이 비어 있습니다.</p>
-                            <?php else: ?>
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <?php if ($hasCategory): ?>
-                                                <th style="width: 22%;">게시판</th>
-                                                <th style="width: 58%;">제목</th>
-                                            <?php else: ?>
-                                                <th style="width: 75%;">제목</th>
-                                            <?php endif; ?>
-                                            <th class="views">조회수</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($posts as $post): ?>
-                                            <tr>
-                                                <?php if ($hasCategory): ?>
-                                                    <td class="category-col">
-                                                        <?php if (!empty($post['category'])): ?>
-                                                            <span class="category-badge"><?php echo htmlspecialchars($post['category']); ?></span>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                <?php endif; ?>
-                                                <td>
-                                                    <?php echo getTierIconHtml($post['views']); ?>
-                                                    <a href="<?php echo htmlspecialchars($post['url']); ?>" target="_blank" rel="noopener noreferrer"><?php echo htmlspecialchars($post['title']); ?></a>
-                                                    <?php if (!empty($post['comment_count'])): ?>
-                                                        <span class="comment-count">[<?php echo htmlspecialchars($post['comment_count']); ?>]</span>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td class="views"><?php echo htmlspecialchars($post['views']); ?></td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            <?php endif; ?>
+                <button id="btn-refresh" class="btn-tool" onclick="location.reload();" title="새로고침">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                    <span>새로고침</span>
+                </button>
+
+                <button id="btn-view-mode" class="btn-tool" onclick="toggleViewMode();" title="탭 모드 / 전체 펼쳐보기 전환">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span id="view-mode-text">모두 펼치기</span>
+                </button>
+
+                <button id="btn-theme" class="btn-tool" onclick="toggleTheme();" title="다크/라이트 모드 전환">
+                    <span id="theme-icon">🌙</span>
+                    <span id="theme-text">다크모드</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <div class="dashboard-grid" id="dashboard-grid">
+            <?php 
+            $siteThemeMap = [
+                '클리앙' => ['class' => 'site-clien', 'url' => 'https://www.clien.net'],
+                '뽐뿌' => ['class' => 'site-ppom', 'url' => 'https://www.ppomppu.co.kr'],
+                '보배드림' => ['class' => 'site-bobae', 'url' => 'https://www.bobaedream.co.kr']
+            ];
+            $siteIndex = 0;
+            ?>
+
+            <?php foreach ($allPostsBySite as $siteName => $boards): ?>
+                <?php 
+                    $siteMeta = $siteThemeMap[$siteName] ?? ['class' => '', 'url' => '#'];
+                    $boardNames = array_keys($boards);
+                ?>
+                <section class="community-card <?php echo $siteMeta['class']; ?>" id="site-card-<?php echo $siteIndex; ?>">
+                    <div class="community-card-header">
+                        <div class="site-meta-bar">
+                            <div class="site-name-wrapper">
+                                <span class="site-dot"></span>
+                                <h2 class="site-title"><?php echo htmlspecialchars($siteName); ?></h2>
+                            </div>
+                            <a href="<?php echo htmlspecialchars($siteMeta['url']); ?>" target="_blank" rel="noopener noreferrer" class="site-link-btn" title="커뮤니티 바로가기">
+                                <span>방문</span>
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                            </a>
                         </div>
-                    <?php endforeach; ?>
-                </div>
-            </section>
-            <?php $siteIndex++; ?>
-        <?php endforeach; ?>
-    </div>
 
-    <div class="float-nav">
-        <button id="nav-up" class="nav-btn">▲</button>
-        <button id="nav-down" class="nav-btn">▼</button>
-    </div>
+                        <!-- 탭 네비게이션 버튼 -->
+                        <div class="tab-group" role="tablist">
+                            <?php $bIdx = 0; foreach ($boardNames as $bName): ?>
+                                <button 
+                                    class="tab-btn <?php echo $bIdx === 0 ? 'active' : ''; ?>" 
+                                    data-site="<?php echo $siteIndex; ?>" 
+                                    data-target="board-<?php echo $siteIndex; ?>-<?php echo $bIdx; ?>" 
+                                    onclick="switchTab(<?php echo $siteIndex; ?>, <?php echo $bIdx; ?>);"
+                                    title="<?php echo htmlspecialchars($bName); ?>">
+                                    <?php echo htmlspecialchars($bName); ?>
+                                </button>
+                            <?php $bIdx++; endforeach; ?>
+                        </div>
+                    </div>
+
+                    <!-- 각 탭별 게시판 패널 -->
+                    <div class="posts-container">
+                        <?php $bIdx = 0; foreach ($boards as $boardName => $boardData): ?>
+                            <?php 
+                                $boardUrl = is_array($boardData) && isset($boardData['url']) ? $boardData['url'] : '';
+                                $posts = is_array($boardData) && isset($boardData['posts']) ? $boardData['posts'] : (is_array($boardData) ? $boardData : []);
+                            ?>
+                            <div class="board-panel <?php echo $bIdx === 0 ? 'active' : ''; ?>" id="board-<?php echo $siteIndex; ?>-<?php echo $bIdx; ?>">
+                                <div class="board-panel-title">
+                                    <?php echo htmlspecialchars($boardName); ?>
+                                    <?php if (!empty($boardUrl)): ?>
+                                        <a href="<?php echo htmlspecialchars($boardUrl); ?>" target="_blank" rel="noopener noreferrer" style="color: inherit; font-size: 0.75rem; margin-left: 4px;">↗</a>
+                                    <?php endif; ?>
+                                </div>
+
+                                <?php if (empty($posts)): ?>
+                                    <div class="empty-posts">게시물을 불러올 수 없거나 목록이 비어 있습니다.</div>
+                                <?php else: ?>
+                                    <table class="posts-table">
+                                        <tbody>
+                                            <?php $rank = 1; foreach ($posts as $post): ?>
+                                                <?php 
+                                                    $commentNum = (int)($post['comment_count'] ?? 0);
+                                                    $commentClass = 'normal';
+                                                    if ($commentNum >= 30) {
+                                                        $commentClass = 'hot';
+                                                    } elseif ($commentNum >= 10) {
+                                                        $commentClass = 'warm';
+                                                    }
+                                                    $postHash = md5($post['url']);
+                                                ?>
+                                                <tr class="post-row" data-post-id="<?php echo $postHash; ?>">
+                                                    <td class="col-title">
+                                                        <div class="title-container">
+                                                            <span class="post-rank <?php echo $rank <= 3 ? 'top3' : ''; ?>"><?php echo $rank; ?></span>
+                                                            
+                                                            <?php if (!empty($post['category'])): ?>
+                                                                <span class="category-tag" title="<?php echo htmlspecialchars($post['category']); ?>">
+                                                                    <?php echo htmlspecialchars($post['category']); ?>
+                                                                </span>
+                                                            <?php endif; ?>
+
+                                                            <?php echo getTierIconHtml($post['views']); ?>
+
+                                                            <a href="<?php echo htmlspecialchars($post['url']); ?>" 
+                                                               target="_blank" 
+                                                               rel="noopener noreferrer" 
+                                                               class="post-link" 
+                                                               title="<?php echo htmlspecialchars($post['title']); ?>"
+                                                               onclick="markAsVisited('<?php echo $postHash; ?>');">
+                                                                <?php echo htmlspecialchars($post['title']); ?>
+                                                            </a>
+
+                                                            <?php if (!empty($post['comment_count'])): ?>
+                                                                <span class="comment-badge <?php echo $commentClass; ?>">
+                                                                    <?php echo htmlspecialchars($post['comment_count']); ?>
+                                                                </span>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    </td>
+                                                    <td class="col-views" title="조회수/추천수">
+                                                        <?php echo htmlspecialchars($post['views']); ?>
+                                                    </td>
+                                                </tr>
+                                            <?php $rank++; endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                <?php endif; ?>
+                            </div>
+                        <?php $bIdx++; endforeach; ?>
+                    </div>
+                </section>
+                <?php $siteIndex++; ?>
+            <?php endforeach; ?>
+        </div>
+    </main>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const sections = document.querySelectorAll('section');
-            const navUp = document.getElementById('nav-up');
-            const navDown = document.getElementById('nav-down');
-            let currentSectionIndex = 0;
+        // 1. 탭 전환 기능
+        function switchTab(siteIndex, boardIndex) {
+            const card = document.getElementById('site-card-' + siteIndex);
+            if (!card) return;
 
-            function scrollToSection(index) {
-                if (index >= 0 && index < sections.length) {
-                    sections[index].scrollIntoView({ behavior: 'smooth' });
-                    currentSectionIndex = index;
+            // 탭 버튼 active 클래스 처리
+            const tabButtons = card.querySelectorAll('.tab-btn');
+            tabButtons.forEach((btn, idx) => {
+                if (idx === boardIndex) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
                 }
+            });
+
+            // 게시판 패널 표시/숨김
+            const panels = card.querySelectorAll('.board-panel');
+            panels.forEach((panel, idx) => {
+                if (idx === boardIndex) {
+                    panel.classList.add('active');
+                } else {
+                    panel.classList.remove('active');
+                }
+            });
+
+            // 사용자 탭 선택 상태 저장 (사이트별)
+            try {
+                localStorage.setItem('tab_site_' + siteIndex, boardIndex);
+            } catch (e) {}
+        }
+
+        // 2. 다크모드 관리
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme') || 
+                (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            setTheme(savedTheme);
+        }
+
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            const icon = document.getElementById('theme-icon');
+            const text = document.getElementById('theme-text');
+            if (theme === 'dark') {
+                icon.textContent = '☀️';
+                text.textContent = '라이트모드';
+            } else {
+                icon.textContent = '🌙';
+                text.textContent = '다크모드';
             }
+            try {
+                localStorage.setItem('theme', theme);
+            } catch (e) {}
+        }
 
-            function findCurrentSection() {
-                let closestSectionIndex = 0;
-                let minDistance = Number.MAX_VALUE;
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            setTheme(newTheme);
+        }
 
-                sections.forEach((section, index) => {
-                    const distance = Math.abs(section.getBoundingClientRect().top);
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        closestSectionIndex = index;
+        // 3. 뷰 모드 관리 (3단 탭 뷰 vs 모두 펼치기)
+        function toggleViewMode() {
+            const container = document.getElementById('dashboard-grid');
+            const btnText = document.getElementById('view-mode-text');
+            const isExpand = container.classList.toggle('expand-mode');
+
+            if (isExpand) {
+                btnText.textContent = '탭 모드로 보기';
+                try { localStorage.setItem('view_mode', 'expand'); } catch (e) {}
+            } else {
+                btnText.textContent = '모두 펼치기';
+                try { localStorage.setItem('view_mode', 'tab'); } catch (e) {}
+            }
+        }
+
+        function initViewMode() {
+            try {
+                const savedMode = localStorage.getItem('view_mode');
+                if (savedMode === 'expand') {
+                    document.getElementById('dashboard-grid').classList.add('expand-mode');
+                    document.getElementById('view-mode-text').textContent = '탭 모드로 보기';
+                }
+            } catch (e) {}
+        }
+
+        // 4. 읽은 글 (Visited) 기억 및 스타일 적용
+        function markAsVisited(postId) {
+            try {
+                let visited = JSON.parse(localStorage.getItem('visited_posts') || '[]');
+                if (!visited.includes(postId)) {
+                    visited.push(postId);
+                    if (visited.length > 500) visited.shift(); // 최대 500개 유지
+                    localStorage.setItem('visited_posts', JSON.stringify(visited));
+                }
+                const row = document.querySelector(`tr[data-post-id="${postId}"]`);
+                if (row) row.classList.add('visited');
+            } catch (e) {}
+        }
+
+        function applyVisitedStyles() {
+            try {
+                const visited = JSON.parse(localStorage.getItem('visited_posts') || '[]');
+                if (visited.length > 0) {
+                    visited.forEach(postId => {
+                        const row = document.querySelector(`tr[data-post-id="${postId}"]`);
+                        if (row) row.classList.add('visited');
+                    });
+                }
+            } catch (e) {}
+        }
+
+        // 5. 이전 탭 위치 복원
+        function restoreTabs() {
+            const cards = document.querySelectorAll('.community-card');
+            cards.forEach((card, siteIndex) => {
+                try {
+                    const savedTabIndex = localStorage.getItem('tab_site_' + siteIndex);
+                    if (savedTabIndex !== null) {
+                        switchTab(siteIndex, parseInt(savedTabIndex, 10));
                     }
-                });
-                return closestSectionIndex;
-            }
-
-            navUp.addEventListener('click', () => {
-                let currentIdx = findCurrentSection();
-                scrollToSection(currentIdx - 1);
+                } catch (e) {}
             });
+        }
 
-            navDown.addEventListener('click', () => {
-                let currentIdx = findCurrentSection();
-                scrollToSection(currentIdx + 1);
-            });
+        // 초기화 실행
+        document.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            initViewMode();
+            restoreTabs();
+            applyVisitedStyles();
         });
     </script>
 </body>
 </html>
-
+<?php
 ?>
