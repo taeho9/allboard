@@ -1,25 +1,35 @@
 <?php
 
 /**
- * URL로부터 HTML 콘텐츠를 안정적으로 가져오는 함수
+ * URL로부터 HTML/XML 콘텐츠를 안정적으로 가져오는 함수
  * @param string $url
  * @return string|null
  */
 function fetchHtml(string $url): ?string
 {
     $ch = curl_init();
+    
+    $parsedUrl = parse_url($url);
+    $host = $parsedUrl['host'] ?? '';
+    
     $headers = [
-        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
         'Cache-Control: no-cache',
         'Pragma: no-cache',
         'Upgrade-Insecure-Requests: 1',
+        'Sec-Ch-Ua: "Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"',
+        'Sec-Ch-Ua-Mobile: ?0',
+        'Sec-Ch-Ua-Platform: "Windows"',
+        'Sec-Fetch-Dest: document',
+        'Sec-Fetch-Mode: navigate',
+        'Sec-Fetch-Site: none',
+        'Sec-Fetch-User: ?1',
     ];
 
-    $parsedUrl = parse_url($url);
-    if (isset($parsedUrl['scheme']) && isset($parsedUrl['host'])) {
-        $headers[] = 'Referer: ' . $parsedUrl['scheme'] . '://' . $parsedUrl['host'] . '/';
+    if (!empty($host)) {
+        $headers[] = 'Referer: https://' . $host . '/';
     }
 
     curl_setopt($ch, CURLOPT_URL, $url);
@@ -27,11 +37,13 @@ function fetchHtml(string $url): ?string
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($ch, CURLOPT_ENCODING, ''); // gzip, deflate 자동 처리
+    curl_setopt($ch, CURLOPT_ENCODING, ''); // gzip, deflate 등 자동 압축 해제
+    curl_setopt($ch, CURLOPT_COOKIEFILE, ''); // 인메모리 쿠키 엔진 활성화
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 4);
+    curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
 
     $html = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -51,21 +63,17 @@ function fetchHtml(string $url): ?string
 function parseClien(DOMXPath $xpath): array
 {
     $posts = [];
-    // 일반 게시글 목록 선택 (공지 및 홍보 제외)
     $articles = $xpath->query("//div[contains(@class, 'list_item') and not(contains(@class, 'notice')) and not(contains(@class, 'hongbo')) and not(contains(@class, 'list_top'))]");
     
     foreach ($articles as $article) {
-        // 조회수 파싱
         $viewsNode = $xpath->query(".//div[contains(@class, 'list_hit')]//span[contains(@class, 'hit')] | .//div[contains(@class, 'list_hit')]", $article);
         $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
 
-        // 카테고리 (분류)가 있는 경우
         $categoryNode = $xpath->query(".//span[contains(@class, 'category')]", $article);
         $categoryPrefix = ($categoryNode->length > 0 && trim($categoryNode->item(0)->textContent) !== '')
             ? '[' . trim($categoryNode->item(0)->textContent) . '] '
             : '';
 
-        // 제목 노드 파싱
         $titleNode = $xpath->query(".//span[contains(@class, 'subject_fixed')]", $article);
         if ($titleNode->length === 0) {
             $titleNode = $xpath->query(".//a[contains(@class, 'list_subject')]", $article);
@@ -82,7 +90,6 @@ function parseClien(DOMXPath $xpath): array
             }
         }
 
-        // 댓글수 파싱
         $commentNode = $xpath->query(".//*[contains(@class, 'rSymph') or contains(@class, 'reply_symph')]", $article);
         $commentCount = '';
         if ($commentNode->length > 0) {
@@ -90,7 +97,6 @@ function parseClien(DOMXPath $xpath): array
             $commentCount = preg_replace('/[^0-9]/', '', $commentText);
         }
 
-        // 링크 URL 파싱
         $urlNode = $xpath->query(".//a[contains(@class, 'list_subject')]", $article);
         $url = 'N/A';
         if ($urlNode->length > 0) {
@@ -118,7 +124,7 @@ function parseClien(DOMXPath $xpath): array
 }
 
 /**
- * 뽐뿌 게시판 파싱 함수 (HOT게시판 및 일반게시판 통합 지원)
+ * 뽐뿌 PC 웹 게시판 파싱 함수
  * @param DOMXPath $xpath
  * @param string $boardUrl
  * @return array
@@ -126,14 +132,9 @@ function parseClien(DOMXPath $xpath): array
 function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
 {
     $posts = [];
-    $isHotBoard = (strpos($boardUrl, 'hot.php') !== false);
-
-    // 게시글 목록 tr 쿼리 (공지 제외)
-    $articleQuery = "//table[contains(@id, 'revolution_main_table') or contains(@class, 'board_table')]//tr[contains(@class, 'baseList') and not(contains(@class, 'baseNotice')) and not(contains(@class, 'notice'))]";
-    $articles = $xpath->query($articleQuery);
+    $articles = $xpath->query("//table[contains(@id, 'revolution_main_table') or contains(@class, 'board_table')]//tr[contains(@class, 'baseList') and not(contains(@class, 'baseNotice')) and not(contains(@class, 'notice'))]");
 
     if ($articles->length === 0) {
-        // 테이블 클래스/id가 다른 경우의 fallback
         $articles = $xpath->query("//tr[contains(@class, 'baseList') and not(contains(@class, 'baseNotice')) and not(contains(@class, 'notice'))]");
     }
 
@@ -143,7 +144,6 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
         $commentCount = '';
         $views = 'N/A';
 
-        // 1. 링크 및 제목 노드 찾기
         $linkNode = $xpath->query('.//a[contains(@class, "baseList-title")] | .//a[contains(@href, "view.php")]', $article)->item(0);
         if ($linkNode) {
             $relativeUrl = trim($linkNode->getAttribute('href'));
@@ -155,12 +155,10 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
                 $url = 'https://www.ppomppu.co.kr/zboard/' . $relativeUrl;
             }
 
-            // 제목 텍스트 정제 (댓글수 span 태그나 img 등 분리)
             $titleParts = '';
             foreach ($linkNode->childNodes as $child) {
                 if ($child instanceof DOMElement) {
                     $cls = $child->getAttribute('class');
-                    // 댓글수 표시 영역 제외
                     if (strpos($cls, 'list_comment') !== false || strpos($cls, 'baseList-c') !== false) {
                         continue;
                     }
@@ -178,14 +176,12 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
             }
         }
 
-        // 2. 댓글 수 파싱
         $commentNode = $xpath->query('.//*[contains(@class, "list_comment") or contains(@class, "baseList-c")]', $article);
         if ($commentNode->length > 0) {
             $commentText = trim($commentNode->item(0)->textContent);
             $commentCount = preg_replace('/[^0-9]/', '', $commentText);
         }
 
-        // 3. 조회수 파싱
         $viewsNode = $xpath->query('.//td[contains(@class, "baseList-views")] | .//td[contains(@class, "board_date")]/following-sibling::td[1]', $article);
         if ($viewsNode->length > 0) {
             $views = trim($viewsNode->item(0)->textContent);
@@ -204,6 +200,206 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
         }
     }
     return $posts;
+}
+
+/**
+ * 뽐뿌 모바일 웹 게시판 파싱 함수
+ * @param DOMXPath $xpath
+ * @param string $mobileUrl
+ * @return array
+ */
+function parsePpomppuMobile(DOMXPath $xpath, string $mobileUrl): array
+{
+    $posts = [];
+    $items = $xpath->query("//ul[contains(@class, 'bbsList') or contains(@class, 'list')]//li | //div[contains(@class, 'bbsList')]//li | //li[contains(@class, 'line')]");
+    if ($items->length === 0) {
+        $items = $xpath->query("//li[contains(@class, 'bbs')] | //ul//li");
+    }
+
+    foreach ($items as $item) {
+        $linkNode = $xpath->query(".//a[contains(@href, 'bbs_view') or contains(@href, 'view.php') or contains(@class, 'title')]", $item)->item(0);
+        if (!$linkNode) {
+            $linkNode = $xpath->query(".//a", $item)->item(0);
+        }
+        if (!$linkNode) {
+            continue;
+        }
+
+        $href = trim($linkNode->getAttribute('href'));
+        if (empty($href) || $href === '#') {
+            continue;
+        }
+
+        if (strpos($href, 'http') === 0) {
+            $url = $href;
+        } elseif (strpos($href, '/') === 0) {
+            $url = 'https://m.ppomppu.co.kr' . $href;
+        } else {
+            $url = 'https://m.ppomppu.co.kr/new/' . $href;
+        }
+
+        // PC URL로 변환
+        if (preg_match('/id=([^&]+).*?no=(\d+)/', $url, $m)) {
+            $url = "https://www.ppomppu.co.kr/zboard/view.php?id={$m[1]}&no={$m[2]}";
+        }
+
+        // 제목 노드 파싱
+        $titleNode = $xpath->query(".//*[contains(@class, 'title') or contains(@class, 'subject') or contains(@class, 'cont')]", $item)->item(0);
+        if (!$titleNode) {
+            $titleNode = $linkNode;
+        }
+        $title = trim($titleNode->textContent);
+
+        // 댓글 수 파싱
+        $commentNode = $xpath->query(".//*[contains(@class, 'hi') or contains(@class, 'comment') or contains(@class, 're')]", $item);
+        $commentCount = '';
+        if ($commentNode->length > 0) {
+            $commentCount = preg_replace('/[^0-9]/', '', $commentNode->item(0)->textContent);
+        } else {
+            if (preg_match('/\[(\d+)\]\s*$/', $title, $m)) {
+                $commentCount = $m[1];
+                $title = trim(preg_replace('/\[\d+\]\s*$/', '', $title));
+            }
+        }
+
+        // 조회수 파싱
+        $viewsNode = $xpath->query(".//*[contains(@class, 'ty') or contains(@class, 'count') or contains(@class, 'views') or contains(@class, 'hit')]", $item);
+        $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
+        if ($views !== 'N/A' && preg_match('/(?:조회|hit|views)?\s*([0-9,kKmM.]+)/u', $views, $m)) {
+            $views = $m[1];
+        }
+
+        if (!empty($title) && $title !== 'N/A' && $url !== 'N/A') {
+            $posts[] = [
+                'views' => $views,
+                'comment_count' => $commentCount,
+                'title' => $title,
+                'url' => $url,
+            ];
+            if (count($posts) >= 20) {
+                break;
+            }
+        }
+    }
+    return $posts;
+}
+
+/**
+ * 뽐뿌 RSS 피드 파싱 함수
+ * @param string $rssXml
+ * @return array
+ */
+function parsePpomppuRss(string $rssXml): array
+{
+    $posts = [];
+    $xml = @simplexml_load_string($rssXml, 'SimpleXMLElement', LIBXML_NOCDATA);
+    if ($xml && isset($xml->channel->item)) {
+        foreach ($xml->channel->item as $item) {
+            $rawTitle = (string)$item->title;
+            $url = (string)$item->link;
+            
+            $commentCount = '';
+            if (preg_match('/\[(\d+)\]\s*$/', $rawTitle, $matches)) {
+                $commentCount = $matches[1];
+                $rawTitle = trim(preg_replace('/\[\d+\]\s*$/', '', $rawTitle));
+            }
+
+            if (!empty($rawTitle) && !empty($url)) {
+                $posts[] = [
+                    'views' => 'N/A',
+                    'comment_count' => $commentCount,
+                    'title' => $rawTitle,
+                    'url' => $url,
+                ];
+                if (count($posts) >= 20) {
+                    break;
+                }
+            }
+        }
+    }
+    return $posts;
+}
+
+/**
+ * 뽐뿌 전용 수집기 (PC -> Mobile -> RSS 3단계 폴백)
+ * @param string $boardUrl
+ * @return array
+ */
+function getPostsForPpomppu(string $boardUrl): array
+{
+    // 1단계: PC 웹 크롤링
+    $html = fetchHtml($boardUrl);
+    if ($html !== null) {
+        $dom = new DOMDocument();
+        $utf8Html = @mb_convert_encoding($html, 'UTF-8', 'EUC-KR, CP949, UTF-8');
+        if ($utf8Html === false) {
+            $utf8Html = $html;
+        }
+        @$dom->loadHTML('<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">' . $utf8Html);
+        $xpath = new DOMXPath($dom);
+        $posts = parsePpomppu($xpath, $boardUrl);
+        if (!empty($posts)) {
+            return $posts;
+        }
+    }
+
+    // 2단계: 모바일 웹 크롤링
+    $mobileUrl = '';
+    if (strpos($boardUrl, 'hot.php') !== false) {
+        $mobileUrl = 'https://m.ppomppu.co.kr/new/hot_bbs.php';
+    } else {
+        $parsed = parse_url($boardUrl);
+        if (isset($parsed['query'])) {
+            parse_str($parsed['query'], $query);
+            if (isset($query['id'])) {
+                $mobileUrl = 'https://m.ppomppu.co.kr/new/bbs_list.php?id=' . urlencode($query['id']);
+            }
+        }
+    }
+
+    if (!empty($mobileUrl)) {
+        $mobileHtml = fetchHtml($mobileUrl);
+        if ($mobileHtml !== null) {
+            $dom = new DOMDocument();
+            $utf8Html = @mb_convert_encoding($mobileHtml, 'UTF-8', 'EUC-KR, CP949, UTF-8');
+            if ($utf8Html === false) {
+                $utf8Html = $mobileHtml;
+            }
+            @$dom->loadHTML('<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">' . $utf8Html);
+            $xpath = new DOMXPath($dom);
+            $posts = parsePpomppuMobile($xpath, $mobileUrl);
+            if (!empty($posts)) {
+                return $posts;
+            }
+        }
+    }
+
+    // 3단계: RSS 피드 수집
+    $rssId = '';
+    if (strpos($boardUrl, 'hot.php') !== false) {
+        $rssId = 'hot';
+    } else {
+        $parsed = parse_url($boardUrl);
+        if (isset($parsed['query'])) {
+            parse_str($parsed['query'], $query);
+            if (isset($query['id'])) {
+                $rssId = $query['id'];
+            }
+        }
+    }
+
+    if (!empty($rssId)) {
+        $rssUrl = 'https://www.ppomppu.co.kr/rss.php?id=' . urlencode($rssId);
+        $rssXml = fetchHtml($rssUrl);
+        if ($rssXml !== null) {
+            $posts = parsePpomppuRss($rssXml);
+            if (!empty($posts)) {
+                return $posts;
+            }
+        }
+    }
+
+    return [];
 }
 
 /**
@@ -368,7 +564,7 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 foreach ($communities as $siteName => $boards) {
     $allPostsBySite[$siteName] = [];
     
-    // 3. 각 게시판 URL에 접속하여 HTML 파싱
+    // 3. 각 게시판 URL에 접속하여 파싱
     foreach ($boards as $boardInfo) {
         $boardName = $boardInfo['name'];
         $boardUrl = $boardInfo['url'];
@@ -378,28 +574,21 @@ foreach ($communities as $siteName => $boards) {
             'posts' => [],
         ];
 
-        $html = fetchHtml($boardUrl);
-
-        if ($html === null) {
-            continue; // 가져오기 실패 시 다음 게시판으로 진행
-        }
-
-        // DOMDocument를 사용하여 HTML 파싱
-        $dom = new DOMDocument();
-        // 뽐뿌는 EUC-KR 인코딩을 사용하므로 UTF-8로 변환
         if ($siteName === '뽐뿌') {
-            $html = mb_convert_encoding($html, 'UTF-8', 'EUC-KR, UTF-8, CP949');
-            $html = mb_encode_numericentity($html, [0x80, 0x10FFFF, 0, ~0], 'UTF-8');
-        }
-        @$dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
-        $xpath = new DOMXPath($dom);
+            $allPostsBySite[$siteName][$boardName]['posts'] = getPostsForPpomppu($boardUrl);
+        } else {
+            $html = fetchHtml($boardUrl);
+            if ($html !== null) {
+                $dom = new DOMDocument();
+                @$dom->loadHTML('<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">' . $html);
+                $xpath = new DOMXPath($dom);
 
-        if ($siteName === '클리앙') {
-            $allPostsBySite[$siteName][$boardName]['posts'] = parseClien($xpath);
-        } elseif ($siteName === '뽐뿌') {
-            $allPostsBySite[$siteName][$boardName]['posts'] = parsePpomppu($xpath, $boardUrl);
-        } elseif ($siteName === '보배드림') {
-            $allPostsBySite[$siteName][$boardName]['posts'] = parseBobaedream($xpath);
+                if ($siteName === '클리앙') {
+                    $allPostsBySite[$siteName][$boardName]['posts'] = parseClien($xpath);
+                } elseif ($siteName === '보배드림') {
+                    $allPostsBySite[$siteName][$boardName]['posts'] = parseBobaedream($xpath);
+                }
+            }
         }
     }
 }
