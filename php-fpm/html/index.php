@@ -110,6 +110,7 @@ function parseClien(DOMXPath $xpath): array
 
         if ($title !== 'N/A' && $url !== 'N/A') {
             $posts[] = [
+                'category' => '',
                 'views' => $views,
                 'comment_count' => $commentCount,
                 'title' => $title,
@@ -139,18 +140,25 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
     }
 
     foreach ($articles as $article) {
+        $category = '';
         $title = '';
         $url = '';
         $commentCount = '';
         $views = 'N/A';
 
-        // tr 내의 모든 링크 검색: 썸네일 이미지 링크(텍스트 없음) 대신 실제 텍스트가 있는 링크 노드 우선 추출
-        $aNodes = $xpath->query('.//a[contains(@href, "view.php") or contains(@href, "zboard.php") or contains(@class, "baseList-title") or contains(@class, "title")]', $article);
+        // 1. 게시판명 / 카테고리 추출 (hot.php의 경우 zboard.php?id= 링크 또는 baseList-cat 태그)
+        $catNode = $xpath->query('.//a[contains(@href, "zboard.php?id=") and not(contains(@href, "no=")) and not(contains(@href, "view.php"))] | .//span[contains(@class, "baseList-cat")]', $article)->item(0);
+        if ($catNode) {
+            $category = trim($catNode->textContent);
+        }
+
+        // 2. 실제 게시글 제목 및 링크 추출: 글 번호(no=) 또는 view.php / bbs_view 링크를 가진 a 태그
+        $viewLinks = $xpath->query('.//a[contains(@href, "view.php") or contains(@href, "no=") or contains(@href, "bbs_view")]', $article);
         
         $selectedLinkNode = null;
         $bestTitle = '';
 
-        foreach ($aNodes as $aNode) {
+        foreach ($viewLinks as $aNode) {
             $href = trim($aNode->getAttribute('href'));
             if (empty($href) || strpos($href, 'javascript:') === 0) {
                 continue;
@@ -178,8 +186,25 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
                 $selectedLinkNode = $aNode;
                 $bestTitle = $text;
                 break;
-            } elseif ($selectedLinkNode === null && !empty($href)) {
+            } elseif ($selectedLinkNode === null) {
                 $selectedLinkNode = $aNode;
+            }
+        }
+
+        // viewLinks가 없을 경우 일반 a 태그 fallback (카테고리 링크 제외)
+        if (!$selectedLinkNode) {
+            $aNodes = $xpath->query('.//a[contains(@class, "baseList-title") or contains(@class, "title")]', $article);
+            foreach ($aNodes as $aNode) {
+                $href = trim($aNode->getAttribute('href'));
+                if (!empty($category) && trim($aNode->textContent) === $category) {
+                    continue;
+                }
+                $text = trim($aNode->textContent);
+                if (!empty($text)) {
+                    $selectedLinkNode = $aNode;
+                    $bestTitle = $text;
+                    break;
+                }
             }
         }
 
@@ -199,7 +224,7 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
             }
         }
 
-        // 댓글 수 파싱: list_comment2 또는 baseList-c 클래스에서 1~5자리 숫자 추출
+        // 댓글 수 파싱
         $commentNode = $xpath->query('.//span[contains(@class, "list_comment2") or contains(@class, "baseList-c")] | .//font[contains(@class, "list_comment")]', $article);
         if ($commentNode->length > 0) {
             $cText = trim($commentNode->item(0)->textContent);
@@ -232,6 +257,7 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
 
         if (!empty($title) && !empty($url)) {
             $posts[] = [
+                'category' => $category,
                 'views' => $views,
                 'comment_count' => $commentCount,
                 'title' => $title,
@@ -260,6 +286,12 @@ function parsePpomppuMobile(DOMXPath $xpath, string $mobileUrl): array
     }
 
     foreach ($items as $item) {
+        $category = '';
+        $catNode = $xpath->query('.//span[contains(@class, "category") or contains(@class, "bbs_name") or contains(@class, "forum")]', $item)->item(0);
+        if ($catNode) {
+            $category = trim($catNode->textContent);
+        }
+
         $aNodes = $xpath->query('.//a[contains(@href, "bbs_view") or contains(@href, "view.php") or contains(@class, "title")]', $item);
         
         $selectedLink = null;
@@ -267,6 +299,9 @@ function parsePpomppuMobile(DOMXPath $xpath, string $mobileUrl): array
 
         foreach ($aNodes as $a) {
             $t = trim($a->textContent);
+            if (!empty($category) && $t === $category) {
+                continue;
+            }
             if (!empty($t)) {
                 $selectedLink = $a;
                 $title = $t;
@@ -324,6 +359,7 @@ function parsePpomppuMobile(DOMXPath $xpath, string $mobileUrl): array
 
         if (!empty($title) && !empty($url)) {
             $posts[] = [
+                'category' => $category,
                 'views' => $views,
                 'comment_count' => $commentCount,
                 'title' => $title,
@@ -350,6 +386,7 @@ function parsePpomppuRss(string $rssXml): array
         foreach ($xml->channel->item as $item) {
             $rawTitle = (string)$item->title;
             $url = (string)$item->link;
+            $category = isset($item->category) ? (string)$item->category : '';
             
             $commentCount = '';
             if (preg_match('/\[(\d+)\]\s*$/', $rawTitle, $matches)) {
@@ -359,6 +396,7 @@ function parsePpomppuRss(string $rssXml): array
 
             if (!empty($rawTitle) && !empty($url)) {
                 $posts[] = [
+                    'category' => $category,
                     'views' => 'N/A',
                     'comment_count' => $commentCount,
                     'title' => $rawTitle,
@@ -503,6 +541,7 @@ function parseBobaedream(DOMXPath $xpath): array
 
         if (!empty($title)) {
             $posts[] = [
+                'category' => '',
                 'views' => $views,
                 'comment_count' => $commentCount,
                 'title' => $title,
@@ -658,34 +697,38 @@ foreach ($communities as $siteName => $boards) {
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; background-color: #f4f4f9; color: #333; }
         .container { max-width: 1440px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { text-align: center; color: #2c3e50; }
-        section { margin-top: 40px; } /* 사이트 섹션 간의 상단 여백 추가 */
+        section { margin-top: 40px; }
         .site-title-container { display: flex; align-items: center; justify-content: space-between; background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 5px solid #3498db; }
         .site-title { font-size: 2em; color: #34495e; margin: 0; flex-grow: 1; }
         .login-btn, .logout-btn { font-size: 0.6em; vertical-align: middle; margin-left: 10px; padding: 5px 10px; border: 1px solid #ccc; background-color: #f0f0f0; color: #333; text-decoration: none; border-radius: 4px; cursor: pointer; }
         .logout-btn { background-color: #e74c3c; color: white; border-color: #c0392b; }
-        /* 로그인 모달 스타일 */
         .modal { display: none; position: fixed; z-index: 1001; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
         .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 400px; border-radius: 8px; }
         .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
         .boards-container { display: flex; flex-wrap: wrap; gap: 20px; }
-        .board-column { flex: 1; min-width: 280px; }
-    .board-title { font-size: 1.5em; color: #1a1a1a; margin-top: 20px; margin-bottom: 15px; }
+        .board-column { flex: 1; min-width: 320px; }
+        .board-title { font-size: 1.3em; color: #1a1a1a; margin-top: 20px; margin-bottom: 15px; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #ddd; font-size: 0.9em; } /* 행간 여백과 폰트 크기 조정 */
+        th, td { padding: 8px 8px; text-align: left; border-bottom: 1px solid #ddd; font-size: 0.9em; }
         th { background-color: #ecf0f1; font-weight: normal; }
-        td { word-break: break-all; } /* 긴 제목이 셀을 넘어가지 않도록 처리 */
+        td { word-break: break-all; }
         tr:hover { background-color: #f5f5f5; }
-        td.views { text-align: center; width: 80px; }
-    a { color: #000000; text-decoration: none; }
+        td.views { text-align: center; width: 75px; font-size: 0.85em; }
+        td.category-col { width: 85px; text-align: center; }
+        .category-badge { display: inline-block; padding: 2px 6px; font-size: 0.8em; font-weight: 500; background-color: #e8f4fd; color: #2980b9; border-radius: 4px; border: 1px solid #d4e6f1; white-space: nowrap; max-width: 80px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+        a { color: #000000; text-decoration: none; }
         a:hover { text-decoration: underline; }
-        .comment-count { color: #e74c3c; font-weight: bold; margin-left: 5px; }
+        .comment-count { color: #e74c3c; font-weight: bold; margin-left: 5px; font-size: 0.85em; }
         .float-nav { position: fixed; top: 50%; right: 20px; transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; z-index: 1000; }
         .nav-btn { width: 50px; height: 50px; background-color: #34495e; color: white; border: none; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: background-color 0.3s; }
         .nav-btn:hover { background-color: #2c3e50; }
         @media (max-width: 768px) {
             body { padding: 5px; }
             .container { padding: 10px 5px; }
-            th, td { padding: 8px 2px; }
+            th, td { padding: 6px 2px; font-size: 0.85em; }
+            td.category-col { width: 65px; }
+            .category-badge { max-width: 60px; font-size: 0.75em; padding: 1px 3px; }
+            td.views { width: 60px; }
         }
         /* 등급 아이콘 스타일 */
         .tier-icon { width: 15px; height: 15px; vertical-align: text-bottom; margin-right: 4px; }
@@ -711,6 +754,15 @@ foreach ($communities as $siteName => $boards) {
                         <?php 
                             $boardUrl = is_array($boardData) && isset($boardData['url']) ? $boardData['url'] : '';
                             $posts = is_array($boardData) && isset($boardData['posts']) ? $boardData['posts'] : (is_array($boardData) ? $boardData : []);
+                            
+                            // 카테고리(게시판명)가 존재하는지 확인
+                            $hasCategory = false;
+                            foreach ($posts as $p) {
+                                if (!empty($p['category'])) {
+                                    $hasCategory = true;
+                                    break;
+                                }
+                            }
                         ?>
                         <div class="board-column">
                             <h3 class="board-title">
@@ -728,13 +780,25 @@ foreach ($communities as $siteName => $boards) {
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th style="width: 75%;">제목</th>
+                                            <?php if ($hasCategory): ?>
+                                                <th style="width: 22%;">게시판</th>
+                                                <th style="width: 58%;">제목</th>
+                                            <?php else: ?>
+                                                <th style="width: 75%;">제목</th>
+                                            <?php endif; ?>
                                             <th class="views">조회수</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <?php foreach ($posts as $post): ?>
                                             <tr>
+                                                <?php if ($hasCategory): ?>
+                                                    <td class="category-col">
+                                                        <?php if (!empty($post['category'])): ?>
+                                                            <span class="category-badge"><?php echo htmlspecialchars($post['category']); ?></span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                <?php endif; ?>
                                                 <td>
                                                     <?php echo getTierIconHtml($post['views']); ?>
                                                     <a href="<?php echo htmlspecialchars($post['url']); ?>" target="_blank" rel="noopener noreferrer"><?php echo htmlspecialchars($post['title']); ?></a>
