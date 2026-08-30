@@ -1,6 +1,49 @@
 <?php
 
 /**
+ * URL로부터 HTML 콘텐츠를 안정적으로 가져오는 함수
+ * @param string $url
+ * @return string|null
+ */
+function fetchHtml(string $url): ?string
+{
+    $ch = curl_init();
+    $headers = [
+        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Cache-Control: no-cache',
+        'Pragma: no-cache',
+        'Upgrade-Insecure-Requests: 1',
+    ];
+
+    $parsedUrl = parse_url($url);
+    if (isset($parsedUrl['scheme']) && isset($parsedUrl['host'])) {
+        $headers[] = 'Referer: ' . $parsedUrl['scheme'] . '://' . $parsedUrl['host'] . '/';
+    }
+
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_ENCODING, ''); // gzip, deflate 자동 처리
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+
+    $html = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode >= 200 && $httpCode < 400 && $html !== false && !empty($html)) {
+        return $html;
+    }
+    return null;
+}
+
+/**
  * 클리앙 게시판 파싱 함수
  * @param DOMXPath $xpath
  * @return array
@@ -8,25 +51,58 @@
 function parseClien(DOMXPath $xpath): array
 {
     $posts = [];
-    $articles = $xpath->query("//div[contains(@class, 'list_item') and contains(@class, 'symph_row')]");
+    // 일반 게시글 목록 선택 (공지 및 홍보 제외)
+    $articles = $xpath->query("//div[contains(@class, 'list_item') and not(contains(@class, 'notice')) and not(contains(@class, 'hongbo')) and not(contains(@class, 'list_top'))]");
+    
     foreach ($articles as $article) {
-        $viewsNode = $xpath->query(".//div[@class='list_hit']/span[@class='hit']", $article);
+        // 조회수 파싱
+        $viewsNode = $xpath->query(".//div[contains(@class, 'list_hit')]//span[contains(@class, 'hit')] | .//div[contains(@class, 'list_hit')]", $article);
         $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
 
+        // 카테고리 (분류)가 있는 경우
+        $categoryNode = $xpath->query(".//span[contains(@class, 'category')]", $article);
+        $categoryPrefix = ($categoryNode->length > 0 && trim($categoryNode->item(0)->textContent) !== '')
+            ? '[' . trim($categoryNode->item(0)->textContent) . '] '
+            : '';
+
+        // 제목 노드 파싱
         $titleNode = $xpath->query(".//span[contains(@class, 'subject_fixed')]", $article);
-        $title = $titleNode->length > 0 ? trim($titleNode->item(0)->getAttribute('title')) : 'N/A';
+        if ($titleNode->length === 0) {
+            $titleNode = $xpath->query(".//a[contains(@class, 'list_subject')]", $article);
+        }
 
-        $commentNode = $xpath->query(".//span[contains(@class, 'rSymph')]", $article);
-        $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
+        $title = 'N/A';
+        if ($titleNode->length > 0) {
+            $rawTitle = trim($titleNode->item(0)->getAttribute('title'));
+            if (empty($rawTitle)) {
+                $rawTitle = trim($titleNode->item(0)->textContent);
+            }
+            if (!empty($rawTitle)) {
+                $title = $categoryPrefix . $rawTitle;
+            }
+        }
 
+        // 댓글수 파싱
+        $commentNode = $xpath->query(".//*[contains(@class, 'rSymph') or contains(@class, 'reply_symph')]", $article);
+        $commentCount = '';
+        if ($commentNode->length > 0) {
+            $commentText = trim($commentNode->item(0)->textContent);
+            $commentCount = preg_replace('/[^0-9]/', '', $commentText);
+        }
+
+        // 링크 URL 파싱
         $urlNode = $xpath->query(".//a[contains(@class, 'list_subject')]", $article);
         $url = 'N/A';
         if ($urlNode->length > 0) {
-            $relativeUrl = $urlNode->item(0)->getAttribute('href');
-            $url = 'https://www.clien.net' . $relativeUrl;
+            $relativeUrl = trim($urlNode->item(0)->getAttribute('href'));
+            if (strpos($relativeUrl, 'http') === 0) {
+                $url = $relativeUrl;
+            } else {
+                $url = 'https://www.clien.net' . (strpos($relativeUrl, '/') === 0 ? '' : '/') . $relativeUrl;
+            }
         }
 
-        if ($title !== 'N/A') {
+        if ($title !== 'N/A' && $url !== 'N/A') {
             $posts[] = [
                 'views' => $views,
                 'comment_count' => $commentCount,
@@ -42,78 +118,80 @@ function parseClien(DOMXPath $xpath): array
 }
 
 /**
- * 뽐뿌 게시판 파싱 함수
+ * 뽐뿌 게시판 파싱 함수 (HOT게시판 및 일반게시판 통합 지원)
  * @param DOMXPath $xpath
  * @param string $boardUrl
  * @return array
  */
 function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
 {
-
     $posts = [];
-    $articleQuery = "//table[@id='revolution_main_table']//tr[contains(@class, 'baseList') and not(contains(@class, 'baseNotice'))]";
+    $isHotBoard = (strpos($boardUrl, 'hot.php') !== false);
 
-    // HOT 게시판은 테이블 구조가 다르므로 다른 쿼리를 사용합니다.
-    if (strpos($boardUrl, 'hot.php') !== false) {
-        // HOT 게시글과 인기글은 동일한 구조를 가집니다.
-        $articleQuery = '//table[contains(@class, "board_table")]//tr[contains(@class, "baseList")]';
-    }
-    $isHotBoard = strpos($boardUrl, 'hot.php') !== false;
-    // 정자게시판(인기) URL인지 확인하는 플래그 추가
-    $isIssueHotBoard = strpos($boardUrl, 'id=issue&hotlist_flag=999') !== false;
-
+    // 게시글 목록 tr 쿼리 (공지 제외)
+    $articleQuery = "//table[contains(@id, 'revolution_main_table') or contains(@class, 'board_table')]//tr[contains(@class, 'baseList') and not(contains(@class, 'baseNotice')) and not(contains(@class, 'notice'))]";
     $articles = $xpath->query($articleQuery);
+
+    if ($articles->length === 0) {
+        // 테이블 클래스/id가 다른 경우의 fallback
+        $articles = $xpath->query("//tr[contains(@class, 'baseList') and not(contains(@class, 'baseNotice')) and not(contains(@class, 'notice'))]");
+    }
 
     foreach ($articles as $article) {
         $title = 'N/A';
         $url = 'N/A';
         $commentCount = '';
         $views = 'N/A';
-        if ($isHotBoard) { // HOT/인기글 게시판 파싱
-            // HOT/인기글 게시판 파싱
-            // <img> 태그를 자식으로 가지는 a 태그를 직접 찾습니다. 이것이 제목과 URL을 모두 포함한 가장 안쪽 태그입니다.
-            $linkNode = $xpath->query('.//a[contains(@class, "baseList-title") and .//img]', $article)->item(0);
-            if ($linkNode) {
-                $relativeUrl = $linkNode->getAttribute('href');
-                $url = 'https://www.ppomppu.co.kr' . $relativeUrl;
 
-                // 찾은 <a> 태그의 자식 노드를 순회하여 <img> 태그 뒤의 텍스트 노드를 제목으로 가져옵니다.
-                $foundImage = false;
-                foreach ($linkNode->childNodes as $child) {
-                    if ($child->nodeName === 'img') {
-                        $foundImage = true;
-                        continue;
-                    }
-                    // img 태그를 찾았고, 현재 노드가 텍스트 노드이며, 내용이 비어있지 않은 경우
-                    if ($foundImage && $child instanceof DOMText && trim($child->nodeValue) !== '') {
-                        $title = trim($child->nodeValue);
-                        break; // 제목을 찾았으면 반복 중단
-                    }
-                }
-            }
-            $commentNode = $xpath->query('.//span[@class="list_comment2"]', $article);
-            // 댓글은 a 태그 밖에 있는 경우도 있고 안에 있는 경우도 있으므로, tr 전체에서 다시 검색합니다.
-            $commentNodeInTr = $xpath->query('.//span[@class="list_comment2"]', $article);
-            $commentCount = $commentNodeInTr->length > 0 ? trim($commentNodeInTr->item(0)->textContent) : '';
-            // 조회수는 'board_date' 클래스를 가진 td의 바로 다음 td에 있습니다.
-            $viewsNode = $xpath->query('.//td[contains(@class, "board_date")]/following-sibling::td[1]', $article);
-            $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
-        } else { // 일반 게시판 (정치게시판 등) 파싱
-            $titleNode = $xpath->query(".//a[contains(@class, 'baseList-title')]", $article)->item(0);
-            if ($titleNode) {
-                $title = trim($titleNode->textContent);
-                $relativeUrl = $titleNode->getAttribute('href');
+        // 1. 링크 및 제목 노드 찾기
+        $linkNode = $xpath->query('.//a[contains(@class, "baseList-title")] | .//a[contains(@href, "view.php")]', $article)->item(0);
+        if ($linkNode) {
+            $relativeUrl = trim($linkNode->getAttribute('href'));
+            if (strpos($relativeUrl, 'http') === 0) {
+                $url = $relativeUrl;
+            } elseif (strpos($relativeUrl, '/') === 0) {
+                $url = 'https://www.ppomppu.co.kr' . $relativeUrl;
+            } else {
                 $url = 'https://www.ppomppu.co.kr/zboard/' . $relativeUrl;
             }
 
-            $commentNode = $xpath->query(".//span[contains(@class, 'baseList-c')]", $article);
-            $commentCount = $commentNode->length > 0 ? trim($commentNode->item(0)->textContent) : '';
-
-            $viewsNode = $xpath->query(".//td[contains(@class, 'baseList-views')]", $article);
-            $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
+            // 제목 텍스트 정제 (댓글수 span 태그나 img 등 분리)
+            $titleParts = '';
+            foreach ($linkNode->childNodes as $child) {
+                if ($child instanceof DOMElement) {
+                    $cls = $child->getAttribute('class');
+                    // 댓글수 표시 영역 제외
+                    if (strpos($cls, 'list_comment') !== false || strpos($cls, 'baseList-c') !== false) {
+                        continue;
+                    }
+                    if ($child->nodeName === 'img') {
+                        continue;
+                    }
+                    $titleParts .= $child->textContent;
+                } elseif ($child instanceof DOMText) {
+                    $titleParts .= $child->nodeValue;
+                }
+            }
+            $title = trim($titleParts);
+            if (empty($title)) {
+                $title = trim($linkNode->textContent);
+            }
         }
 
-        if ($title !== 'N/A') {
+        // 2. 댓글 수 파싱
+        $commentNode = $xpath->query('.//*[contains(@class, "list_comment") or contains(@class, "baseList-c")]', $article);
+        if ($commentNode->length > 0) {
+            $commentText = trim($commentNode->item(0)->textContent);
+            $commentCount = preg_replace('/[^0-9]/', '', $commentText);
+        }
+
+        // 3. 조회수 파싱
+        $viewsNode = $xpath->query('.//td[contains(@class, "baseList-views")] | .//td[contains(@class, "board_date")]/following-sibling::td[1]', $article);
+        if ($viewsNode->length > 0) {
+            $views = trim($viewsNode->item(0)->textContent);
+        }
+
+        if ($title !== 'N/A' && $url !== 'N/A') {
             $posts[] = [
                 'views' => $views,
                 'comment_count' => $commentCount,
@@ -136,7 +214,10 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
 function parseBobaedream(DOMXPath $xpath): array
 {
     $posts = [];
-    $articles = $xpath->query("//table[contains(@class, 'clistTable02')]//tbody//tr");
+    $articles = $xpath->query("//table[contains(@class, 'clistTable02') or contains(@class, 'board_list')]//tbody//tr");
+    if ($articles->length === 0) {
+        $articles = $xpath->query("//table[contains(@class, 'clistTable02') or contains(@class, 'board_list')]//tr");
+    }
 
     foreach ($articles as $article) {
         $titleNode = $xpath->query(".//a[contains(@class, 'bsubject')]", $article);
@@ -145,11 +226,14 @@ function parseBobaedream(DOMXPath $xpath): array
         }
 
         $linkElement = $titleNode->item(0);
-        $relativeUrl = $linkElement->getAttribute('href');
-        $url = 'https://www.bobaedream.co.kr' . $relativeUrl;
+        $relativeUrl = trim($linkElement->getAttribute('href'));
+        if (strpos($relativeUrl, 'http') === 0) {
+            $url = $relativeUrl;
+        } else {
+            $url = 'https://www.bobaedream.co.kr' . (strpos($relativeUrl, '/') === 0 ? '' : '/') . $relativeUrl;
+        }
 
         $commentCount = '';
-        // 댓글 개수 파싱 수정: span 또는 strong 태그의 tot_reply 또는 totreply 클래스 확인
         $commentNode = $xpath->query(".//*[contains(@class, 'tot_reply') or contains(@class, 'totreply')]", $article);
         if ($commentNode->length > 0) {
             $commentCount = trim($commentNode->item(0)->textContent);
@@ -168,15 +252,16 @@ function parseBobaedream(DOMXPath $xpath): array
         $viewsNode = $xpath->query(".//td[contains(@class, 'count')]", $article);
         $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
 
-        $posts[] = [
-            'views' => $views,
-            'comment_count' => $commentCount,
-            'title' => $title,
-            'url' => $url,
-        ];
-
-        if (count($posts) >= 20) {
-            break;
+        if (!empty($title)) {
+            $posts[] = [
+                'views' => $views,
+                'comment_count' => $commentCount,
+                'title' => $title,
+                'url' => $url,
+            ];
+            if (count($posts) >= 20) {
+                break;
+            }
         }
     }
     return $posts;
@@ -199,13 +284,17 @@ function getTierIconHtml(string $viewsStr): string
         $views = (int)preg_replace('/[^0-9]/', '', $parts[0]);
         $isVote = true;
     } else {
-        // 조회수 형식 확인 (예: "11.1 k")
         $lowerStr = strtolower($viewsStr);
-        if (strpos($lowerStr, 'k') !== false) {
+        // 백만 단위 (M) 처리 (예: "3.5 M")
+        if (strpos($lowerStr, 'm') !== false) {
+            $numberPart = (float)preg_replace('/[^0-9.]/', '', $lowerStr);
+            $views = (int)($numberPart * 1000000);
+        } elseif (strpos($lowerStr, 'k') !== false) {
+            // 천 단위 (k) 처리 (예: "11.1 k")
             $numberPart = (float)preg_replace('/[^0-9.]/', '', $lowerStr);
             $views = (int)($numberPart * 1000);
         } elseif (strpos($viewsStr, '.') !== false) {
-            // 'k'가 텍스트에 포함되지 않았지만 소수점이 있는 경우 (예: "21.3" -> 21300)
+            // 'k'가 없으나 소수점이 있는 경우 (예: "21.3")
             $numberPart = (float)preg_replace('/[^0-9.]/', '', $viewsStr);
             $views = (int)($numberPart * 1000);
         } else {
@@ -257,7 +346,6 @@ function getTierIconHtml(string $viewsStr): string
     );
 }
 
-
 // --- 메인 로직 시작 ---
 $jsonFile = 'boards.json';
 
@@ -270,7 +358,6 @@ if (!file_exists($jsonFile)) {
 }
 
 $jsonContent = file_get_contents($jsonFile);
-// JSON을 연관 배열로 변환
 $communities = json_decode($jsonContent, true);
 
 if (json_last_error() !== JSON_ERROR_NONE) {
@@ -279,53 +366,40 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 
 // 2. 각 커뮤니티 사이트별로 반복
 foreach ($communities as $siteName => $boards) {
-    // echo "========= [{$siteName}] 사이트 처리 시작 =========\n";
-    // error_log("========= [{$siteName}] 사이트 처리 시작 =========");
-    // 결과 배열에 사이트 이름을 키로 하는 빈 배열을 초기화
     $allPostsBySite[$siteName] = [];
     
-    // 3. 각 게시판 URL에 접속하여 HTML 파싱 (기존 로직)
+    // 3. 각 게시판 URL에 접속하여 HTML 파싱
     foreach ($boards as $boardInfo) {
         $boardName = $boardInfo['name'];
         $boardUrl = $boardInfo['url'];
         
-        // 사이트 배열 아래에 게시판 이름으로 된 빈 배열을 초기화합니다.
-        $allPostsBySite[$siteName][$boardName] = [];
+        $allPostsBySite[$siteName][$boardName] = [
+            'url' => $boardUrl,
+            'posts' => [],
+        ];
 
-        // cURL을 사용하여 URL로부터 HTML을 가져옵니다.
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $boardUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+        $html = fetchHtml($boardUrl);
 
-        $html = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($httpCode != 200 || $html === false) {
-            // echo "경고: '{$boardName}' 게시판의 HTML을 가져오는 데 실패했습니다. (HTTP 상태 코드: {$httpCode})\n";
-            // error_log("경고: '{$boardName}' 게시판의 HTML을 가져오는 데 실패했습니다. (HTTP 상태 코드: {$httpCode})");
-            continue; // 다음 게시판으로 넘어감
+        if ($html === null) {
+            continue; // 가져오기 실패 시 다음 게시판으로 진행
         }
 
         // DOMDocument를 사용하여 HTML 파싱
         $dom = new DOMDocument();
         // 뽐뿌는 EUC-KR 인코딩을 사용하므로 UTF-8로 변환
         if ($siteName === '뽐뿌') {
-            // EUC-KR -> UTF-8 변환 후 HTML 숫자 엔티티로 변환 (PHP 8.2+ 호환)
-            $html = mb_convert_encoding($html, 'UTF-8', 'EUC-KR');
+            $html = mb_convert_encoding($html, 'UTF-8', 'EUC-KR, UTF-8, CP949');
             $html = mb_encode_numericentity($html, [0x80, 0x10FFFF, 0, ~0], 'UTF-8');
         }
         @$dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
         $xpath = new DOMXPath($dom);
 
         if ($siteName === '클리앙') {
-            $allPostsBySite[$siteName][$boardName] = parseClien($xpath);
+            $allPostsBySite[$siteName][$boardName]['posts'] = parseClien($xpath);
         } elseif ($siteName === '뽐뿌') {
-            $allPostsBySite[$siteName][$boardName] = parsePpomppu($xpath, $boardUrl);
+            $allPostsBySite[$siteName][$boardName]['posts'] = parsePpomppu($xpath, $boardUrl);
         } elseif ($siteName === '보배드림') {
-            $allPostsBySite[$siteName][$boardName] = parseBobaedream($xpath);
+            $allPostsBySite[$siteName][$boardName]['posts'] = parseBobaedream($xpath);
         }
     }
 }
@@ -385,17 +459,29 @@ foreach ($communities as $siteName => $boards) {
 
         <?php $siteIndex = 0; ?>
         <?php foreach ($allPostsBySite as $siteName => $boards): ?>
-            <section>
+            <section id="site-<?php echo $siteIndex; ?>">
                 <div class="site-title-container">
                     <h2 class="site-title"><?php echo htmlspecialchars($siteName); ?></h2>
                 </div>
 
                 <div class="boards-container">
-                    <?php foreach ($boards as $boardName => $posts): ?>
+                    <?php foreach ($boards as $boardName => $boardData): ?>
+                        <?php 
+                            $boardUrl = is_array($boardData) && isset($boardData['url']) ? $boardData['url'] : '';
+                            $posts = is_array($boardData) && isset($boardData['posts']) ? $boardData['posts'] : (is_array($boardData) ? $boardData : []);
+                        ?>
                         <div class="board-column">
-                            <h3 class="board-title"><?php echo htmlspecialchars($boardName); ?></h3>
+                            <h3 class="board-title">
+                                <?php if (!empty($boardUrl)): ?>
+                                    <a href="<?php echo htmlspecialchars($boardUrl); ?>" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">
+                                        <?php echo htmlspecialchars($boardName); ?> ↗
+                                    </a>
+                                <?php else: ?>
+                                    <?php echo htmlspecialchars($boardName); ?>
+                                <?php endif; ?>
+                            </h3>
                             <?php if (empty($posts)): ?>
-                                <p>게시물이 없습니다.</p>
+                                <p style="color: #888; font-size: 0.9em; padding: 10px 0;">게시물을 불러올 수 없거나 목록이 비어 있습니다.</p>
                             <?php else: ?>
                                 <table>
                                     <thead>
@@ -409,7 +495,7 @@ foreach ($communities as $siteName => $boards) {
                                             <tr>
                                                 <td>
                                                     <?php echo getTierIconHtml($post['views']); ?>
-                                                    <a href="<?php echo htmlspecialchars($post['url']); ?>" target="_blank"><?php echo htmlspecialchars($post['title']); ?></a>
+                                                    <a href="<?php echo htmlspecialchars($post['url']); ?>" target="_blank" rel="noopener noreferrer"><?php echo htmlspecialchars($post['title']); ?></a>
                                                     <?php if (!empty($post['comment_count'])): ?>
                                                         <span class="comment-count">[<?php echo htmlspecialchars($post['comment_count']); ?>]</span>
                                                     <?php endif; ?>

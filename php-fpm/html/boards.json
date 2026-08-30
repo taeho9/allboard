@@ -1,30 +1,30 @@
 {
   "클리앙": [
     {
-      "name": "추천글",
-      "url": "https://www.clien.net/service/recommend"
+      "name": "모두의공원",
+      "url": "https://www.clien.net/service/board/park"
     },
     {
-      "name": "강좌/사용기",
-      "url": "https://www.clien.net/service/group/allreview"
+      "name": "새로운소식",
+      "url": "https://www.clien.net/service/board/news"
     },
     {
-      "name": "정보와 자료",
-      "url": "https://www.clien.net/service/group/allinfo"
+      "name": "자료실",
+      "url": "https://www.clien.net/service/board/pds"
     }
   ],
   "뽐뿌": [
     {
       "name": "HOT 게시글",
-      "url": "https://www.ppomppu.co.kr/hot.php?category=2"
+      "url": "https://www.ppomppu.co.kr/hot.php"
     },
     {
-      "name": "인기글",
-      "url": "https://www.ppomppu.co.kr/hot.php?category=1"
+      "name": "유머글",
+      "url": "https://www.ppomppu.co.kr/zboard/zboard.php?id=humor"
     },
     {
-      "name": "정치자유게시판",
-      "url": "https://www.ppomppu.co.kr/zboard/zboard.php?id=issue"
+      "name": "유튜브/숏폼",
+      "url": "https://www.ppomppu.co.kr/zboard/zboard.php?id=youtube_info"
     }
   ],
   "보배드림": [
