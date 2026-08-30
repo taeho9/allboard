@@ -139,14 +139,52 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
     }
 
     foreach ($articles as $article) {
-        $title = 'N/A';
-        $url = 'N/A';
+        $title = '';
+        $url = '';
         $commentCount = '';
         $views = 'N/A';
 
-        $linkNode = $xpath->query('.//a[contains(@class, "baseList-title")] | .//a[contains(@href, "view.php")]', $article)->item(0);
-        if ($linkNode) {
-            $relativeUrl = trim($linkNode->getAttribute('href'));
+        // tr 내의 모든 링크 검색: 썸네일 이미지 링크(텍스트 없음) 대신 실제 텍스트가 있는 링크 노드 우선 추출
+        $aNodes = $xpath->query('.//a[contains(@href, "view.php") or contains(@href, "zboard.php") or contains(@class, "baseList-title") or contains(@class, "title")]', $article);
+        
+        $selectedLinkNode = null;
+        $bestTitle = '';
+
+        foreach ($aNodes as $aNode) {
+            $href = trim($aNode->getAttribute('href'));
+            if (empty($href) || strpos($href, 'javascript:') === 0) {
+                continue;
+            }
+
+            // a 태그 내부에서 댓글수 span이나 img를 제외한 순수 텍스트 추출
+            $text = '';
+            foreach ($aNode->childNodes as $child) {
+                if ($child instanceof DOMElement) {
+                    $cls = $child->getAttribute('class');
+                    if (strpos($cls, 'list_comment') !== false || strpos($cls, 'baseList-c') !== false || strpos($cls, 'comment') !== false) {
+                        continue;
+                    }
+                    if ($child->nodeName === 'img') {
+                        continue;
+                    }
+                    $text .= $child->textContent;
+                } elseif ($child instanceof DOMText) {
+                    $text .= $child->nodeValue;
+                }
+            }
+            $text = trim($text);
+
+            if (!empty($text)) {
+                $selectedLinkNode = $aNode;
+                $bestTitle = $text;
+                break;
+            } elseif ($selectedLinkNode === null && !empty($href)) {
+                $selectedLinkNode = $aNode;
+            }
+        }
+
+        if ($selectedLinkNode) {
+            $relativeUrl = trim($selectedLinkNode->getAttribute('href'));
             if (strpos($relativeUrl, 'http') === 0) {
                 $url = $relativeUrl;
             } elseif (strpos($relativeUrl, '/') === 0) {
@@ -155,39 +193,44 @@ function parsePpomppu(DOMXPath $xpath, string $boardUrl): array
                 $url = 'https://www.ppomppu.co.kr/zboard/' . $relativeUrl;
             }
 
-            $titleParts = '';
-            foreach ($linkNode->childNodes as $child) {
-                if ($child instanceof DOMElement) {
-                    $cls = $child->getAttribute('class');
-                    if (strpos($cls, 'list_comment') !== false || strpos($cls, 'baseList-c') !== false) {
-                        continue;
-                    }
-                    if ($child->nodeName === 'img') {
-                        continue;
-                    }
-                    $titleParts .= $child->textContent;
-                } elseif ($child instanceof DOMText) {
-                    $titleParts .= $child->nodeValue;
-                }
-            }
-            $title = trim($titleParts);
+            $title = $bestTitle;
             if (empty($title)) {
-                $title = trim($linkNode->textContent);
+                $title = trim($selectedLinkNode->getAttribute('title')) ?: trim($selectedLinkNode->textContent);
             }
         }
 
-        $commentNode = $xpath->query('.//*[contains(@class, "list_comment") or contains(@class, "baseList-c")]', $article);
+        // 댓글 수 파싱: list_comment2 또는 baseList-c 클래스에서 1~5자리 숫자 추출
+        $commentNode = $xpath->query('.//span[contains(@class, "list_comment2") or contains(@class, "baseList-c")] | .//font[contains(@class, "list_comment")]', $article);
         if ($commentNode->length > 0) {
-            $commentText = trim($commentNode->item(0)->textContent);
-            $commentCount = preg_replace('/[^0-9]/', '', $commentText);
+            $cText = trim($commentNode->item(0)->textContent);
+            if (preg_match('/\[?(\d{1,5})\]?/', $cText, $cm)) {
+                $commentCount = $cm[1];
+            }
+        }
+        
+        // 제목 끝에 [숫자]가 포함되어 있는 경우 분리 정제
+        if (preg_match('/\[(\d{1,5})\]\s*$/', $title, $m)) {
+            if (empty($commentCount)) {
+                $commentCount = $m[1];
+            }
+            $title = trim(preg_replace('/\[\d{1,5}\]\s*$/', '', $title));
         }
 
+        // 조회수 / 추천수 파싱
         $viewsNode = $xpath->query('.//td[contains(@class, "baseList-views")] | .//td[contains(@class, "board_date")]/following-sibling::td[1]', $article);
         if ($viewsNode->length > 0) {
             $views = trim($viewsNode->item(0)->textContent);
+        } else {
+            $tds = $xpath->query('.//td', $article);
+            if ($tds->length >= 5) {
+                $candidate = trim($tds->item($tds->length - 2)->textContent);
+                if (preg_match('/^\d+\s*-\s*\d+$/', $candidate) || is_numeric($candidate)) {
+                    $views = $candidate;
+                }
+            }
         }
 
-        if ($title !== 'N/A' && $url !== 'N/A') {
+        if (!empty($title) && !empty($url)) {
             $posts[] = [
                 'views' => $views,
                 'comment_count' => $commentCount,
@@ -217,15 +260,27 @@ function parsePpomppuMobile(DOMXPath $xpath, string $mobileUrl): array
     }
 
     foreach ($items as $item) {
-        $linkNode = $xpath->query(".//a[contains(@href, 'bbs_view') or contains(@href, 'view.php') or contains(@class, 'title')]", $item)->item(0);
-        if (!$linkNode) {
-            $linkNode = $xpath->query(".//a", $item)->item(0);
+        $aNodes = $xpath->query('.//a[contains(@href, "bbs_view") or contains(@href, "view.php") or contains(@class, "title")]', $item);
+        
+        $selectedLink = null;
+        $title = '';
+
+        foreach ($aNodes as $a) {
+            $t = trim($a->textContent);
+            if (!empty($t)) {
+                $selectedLink = $a;
+                $title = $t;
+                break;
+            } elseif ($selectedLink === null) {
+                $selectedLink = $a;
+            }
         }
-        if (!$linkNode) {
+
+        if (!$selectedLink) {
             continue;
         }
 
-        $href = trim($linkNode->getAttribute('href'));
+        $href = trim($selectedLink->getAttribute('href'));
         if (empty($href) || $href === '#') {
             continue;
         }
@@ -243,33 +298,31 @@ function parsePpomppuMobile(DOMXPath $xpath, string $mobileUrl): array
             $url = "https://www.ppomppu.co.kr/zboard/view.php?id={$m[1]}&no={$m[2]}";
         }
 
-        // 제목 노드 파싱
-        $titleNode = $xpath->query(".//*[contains(@class, 'title') or contains(@class, 'subject') or contains(@class, 'cont')]", $item)->item(0);
-        if (!$titleNode) {
-            $titleNode = $linkNode;
-        }
-        $title = trim($titleNode->textContent);
-
         // 댓글 수 파싱
-        $commentNode = $xpath->query(".//*[contains(@class, 'hi') or contains(@class, 'comment') or contains(@class, 're')]", $item);
         $commentCount = '';
+        $commentNode = $xpath->query('.//span[contains(@class, "hi") or contains(@class, "comment") or contains(@class, "re")]', $item);
         if ($commentNode->length > 0) {
-            $commentCount = preg_replace('/[^0-9]/', '', $commentNode->item(0)->textContent);
-        } else {
-            if (preg_match('/\[(\d+)\]\s*$/', $title, $m)) {
-                $commentCount = $m[1];
-                $title = trim(preg_replace('/\[\d+\]\s*$/', '', $title));
+            $cText = trim($commentNode->item(0)->textContent);
+            if (preg_match('/(\d{1,5})/', $cText, $cm)) {
+                $commentCount = $cm[1];
             }
+        }
+        
+        if (preg_match('/\[(\d{1,5})\]\s*$/', $title, $m)) {
+            if (empty($commentCount)) {
+                $commentCount = $m[1];
+            }
+            $title = trim(preg_replace('/\[\d{1,5}\]\s*$/', '', $title));
         }
 
         // 조회수 파싱
-        $viewsNode = $xpath->query(".//*[contains(@class, 'ty') or contains(@class, 'count') or contains(@class, 'views') or contains(@class, 'hit')]", $item);
+        $viewsNode = $xpath->query('.//*[contains(@class, "ty") or contains(@class, "count") or contains(@class, "views") or contains(@class, "hit")]', $item);
         $views = $viewsNode->length > 0 ? trim($viewsNode->item(0)->textContent) : 'N/A';
         if ($views !== 'N/A' && preg_match('/(?:조회|hit|views)?\s*([0-9,kKmM.]+)/u', $views, $m)) {
             $views = $m[1];
         }
 
-        if (!empty($title) && $title !== 'N/A' && $url !== 'N/A') {
+        if (!empty($title) && !empty($url)) {
             $posts[] = [
                 'views' => $views,
                 'comment_count' => $commentCount,
